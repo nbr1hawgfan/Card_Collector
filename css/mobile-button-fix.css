@@ -1,0 +1,87 @@
+
+/* =========================================================
+   Mobile control reset and filter-button fix — v4
+   ========================================================= */
+
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 11px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  min-height: 44px;
+}
+
+.filter-chip {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin: 0;
+  border: 1px solid #d7cac4;
+  border-radius: 999px;
+  padding: .62rem .9rem;
+  color: #5c4d51;
+  background-color: #ffffff;
+  background-image: none;
+  box-shadow: none;
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.filter-chip:hover {
+  border-color: #9f7f87;
+  background-color: #faf6f4;
+}
+
+.filter-chip:active {
+  transform: scale(.97);
+}
+
+.filter-chip.active,
+.filter-chip[aria-pressed="true"] {
+  border-color: #6b1f2b;
+  color: #ffffff;
+  background-color: #6b1f2b;
+  background-image: none;
+  box-shadow: 0 4px 10px rgba(84, 25, 35, .18);
+}
+
+@media (max-width: 680px) {
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .55rem;
+    overflow: visible;
+    padding: .1rem 0 .4rem;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  .filter-chip {
+    flex: 0 0 auto;
+    min-width: 72px;
+    min-height: 46px;
+    padding: .68rem .9rem;
+  }
+
+  .button,
+  .delete-button {
+    min-height: 46px;
+  }
+}
