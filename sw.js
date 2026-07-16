@@ -1,9 +1,9 @@
-const CACHE_NAME = "rookie-vault-v15";
+const CACHE_NAME = "rookie-vault-v16";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./css/app.css?v=15",
-  "./js/app.js?v=15",
+  "./css/app.css?v=16",
+  "./js/app.js?v=16",
   "./manifest.webmanifest",
   "./icons/icon.svg"
 ];

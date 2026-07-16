@@ -47,6 +47,17 @@ const elements = {
   scanMessage: document.querySelector("#scanMessage"),
   homeAddButton: document.querySelector("#homeAddButton"),
   homeSetsButton: document.querySelector("#homeSetsButton"),
+  homeShowButton: document.querySelector("#homeShowButton"),
+  showView: document.querySelector("#showView"),
+  exitShowModeButton: document.querySelector("#exitShowModeButton"),
+  showModeFilters: document.querySelector("#showModeFilters"),
+  showModeSearchInput: document.querySelector("#showModeSearchInput"),
+  showModeGrid: document.querySelector("#showModeGrid"),
+  showModeEmpty: document.querySelector("#showModeEmpty"),
+  showTradeCount: document.querySelector("#showTradeCount"),
+  showDuplicateCount: document.querySelector("#showDuplicateCount"),
+  showWishlistCount: document.querySelector("#showWishlistCount"),
+  showHighValueCount: document.querySelector("#showHighValueCount"),
   manageSetsButton: document.querySelector("#manageSetsButton"),
   homeSetProgressGrid: document.querySelector("#homeSetProgressGrid"),
   homeSetEmpty: document.querySelector("#homeSetEmpty"),
@@ -127,6 +138,10 @@ const elements = {
   trashCount: document.querySelector("#trashCount"),
   sportFilters: document.querySelector("#sportFilters"),
   statusFilters: document.querySelector("#statusFilters"),
+  wishlistPriorityLabel: document.querySelector("#wishlistPriorityLabel"),
+  wishlistPriorityInput: document.querySelector("#wishlistPriorityInput"),
+  wishlistTargetLabel: document.querySelector("#wishlistTargetLabel"),
+  wishlistTargetInput: document.querySelector("#wishlistTargetInput"),
   resultCount: document.querySelector("#resultCount"),
   cardsGrid: document.querySelector("#cardsGrid"),
   emptyState: document.querySelector("#emptyState"),
@@ -184,6 +199,8 @@ const elements = {
   priceResearchDate: document.querySelector("#priceResearchDate"),
   detailSport: document.querySelector("#detailSport"),
   detailStatus: document.querySelector("#detailStatus"),
+  detailWishlistPriority: document.querySelector("#detailWishlistPriority"),
+  detailWishlistTarget: document.querySelector("#detailWishlistTarget"),
   detailBadges: document.querySelector("#detailBadges"),
   detailLocation: document.querySelector("#detailLocation"),
   detailParallel: document.querySelector("#detailParallel"),
@@ -219,6 +236,7 @@ let scanOcrWorker = null;
 let setGoals = [];
 let selectedSetGoal = null;
 let selectedMissingNumber = null;
+let activeShowFilter = "trade";
 
 applyInitialTheme();
 init();
@@ -262,6 +280,7 @@ function bindEvents() {
 
   elements.homeAddButton.addEventListener("click", () => navigateTo("add"));
   elements.homeSetsButton.addEventListener("click", () => navigateTo("sets"));
+  elements.homeShowButton.addEventListener("click", enterCardShowMode);
   elements.manageSetsButton.addEventListener("click", () => navigateTo("sets"));
   elements.viewAllCardsButton.addEventListener("click", () => navigateTo("collection"));
   elements.exportCsvButton.addEventListener("click", exportCollectionCsv);
@@ -287,7 +306,17 @@ function bindEvents() {
   elements.setDialog.addEventListener("click", event => {
     if (event.target === elements.setDialog) closeSetDialog();
   });
+  elements.exitShowModeButton.addEventListener("click", exitCardShowMode);
+  elements.showModeSearchInput.addEventListener("input", renderCardShowMode);
+  elements.showModeFilters.addEventListener("click", event => {
+    const button = event.target.closest("[data-show-filter]");
+    if (!button) return;
+    activeShowFilter = button.dataset.showFilter;
+    setActiveChip(elements.showModeFilters, button);
+    renderCardShowMode();
+  });
   updateLastBackupDisplay();
+  updateWishlistFields();
   elements.signupButton.addEventListener("click", signUp);
   elements.logoutButton.addEventListener("click", signOut);
   elements.themeToggle.addEventListener("click", toggleTheme);
@@ -305,6 +334,8 @@ function bindEvents() {
     setActiveChip(elements.sportFilters, button);
     renderCards();
   });
+
+  document.querySelector("#statusInput").addEventListener("change", updateWishlistFields);
 
   elements.statusFilters.addEventListener("click", event => {
     const button = event.target.closest("[data-status]");
@@ -552,6 +583,14 @@ async function saveCard(event) {
       card_number: valueOf("#cardNumberInput") || null,
       estimated_value: numberOrNull(valueOf("#valueInput")) ?? 0,
       status: valueOf("#statusInput"),
+      wishlist_priority:
+        valueOf("#statusInput") === "want"
+          ? elements.wishlistPriorityInput.value
+          : null,
+      wishlist_target_price:
+        valueOf("#statusInput") === "want"
+          ? numberOrNull(elements.wishlistTargetInput.value)
+          : null,
       storage_location: valueOf("#locationInput") || null,
       notes: valueOf("#notesInput") || null,
       is_rookie: elements.rookieInput.checked,
@@ -697,6 +736,143 @@ function previewSelectedPhoto(input, imageElement) {
 
 
 
+
+
+function updateWishlistFields() {
+  const isWishlist = document.querySelector("#statusInput").value === "want";
+  elements.wishlistPriorityLabel.classList.toggle("hidden", !isWishlist);
+  elements.wishlistTargetLabel.classList.toggle("hidden", !isWishlist);
+}
+
+function enterCardShowMode() {
+  document.body.classList.add("show-mode-active");
+  navigateTo("show");
+}
+
+function exitCardShowMode() {
+  document.body.classList.remove("show-mode-active");
+  navigateTo("home");
+}
+
+function renderCardShowMode() {
+  const activeCards = cards.filter(card => !card.deleted_at);
+  const query = elements.showModeSearchInput.value.trim().toLowerCase();
+
+  elements.showTradeCount.textContent =
+    activeCards.filter(card => card.status === "trade").length;
+  elements.showDuplicateCount.textContent =
+    activeCards.filter(card =>
+      card.status === "duplicate" || Number(card.quantity || 1) > 1
+    ).length;
+  elements.showWishlistCount.textContent =
+    activeCards.filter(card => card.status === "want").length;
+  elements.showHighValueCount.textContent =
+    activeCards.filter(card => Number(card.estimated_value || 0) >= 50).length;
+
+  const filtered = activeCards.filter(card => {
+    const matchesFilter =
+      activeShowFilter === "all" ||
+      (activeShowFilter === "trade" && card.status === "trade") ||
+      (activeShowFilter === "duplicate" &&
+        (card.status === "duplicate" || Number(card.quantity || 1) > 1)) ||
+      (activeShowFilter === "want" && card.status === "want") ||
+      (activeShowFilter === "high-value" &&
+        Number(card.estimated_value || 0) >= 50);
+
+    const haystack = [
+      card.player_name,
+      card.card_year,
+      card.brand,
+      card.set_name,
+      card.card_number,
+      card.parallel_name,
+      card.sport,
+      card.status,
+      card.grading_company,
+      card.grade
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    return matchesFilter && haystack.includes(query);
+  });
+
+  elements.showModeGrid.replaceChildren();
+
+  for (const card of filtered) {
+    const article = document.createElement("article");
+    article.className = "show-card";
+    article.tabIndex = 0;
+    article.setAttribute("role", "button");
+
+    const photo = document.createElement("div");
+    photo.className = "show-card-photo";
+
+    if (card.front_photo_url) {
+      const image = document.createElement("img");
+      image.src = card.front_photo_url;
+      image.alt = `Front of ${card.player_name}`;
+      photo.append(image);
+    } else {
+      photo.textContent = "No photo";
+    }
+
+    const info = document.createElement("div");
+    info.className = "show-card-info";
+
+    const title = document.createElement("h3");
+    title.textContent = card.player_name;
+
+    const meta = document.createElement("div");
+    meta.className = "show-card-meta";
+    meta.textContent = [
+      card.card_year,
+      card.brand,
+      card.set_name,
+      card.card_number ? `#${card.card_number}` : null
+    ].filter(Boolean).join(" • ");
+
+    const footer = document.createElement("div");
+    footer.className = "show-card-footer";
+
+    const status = document.createElement("span");
+    status.textContent = titleCase(card.status || "keep");
+
+    const value = document.createElement("span");
+    value.textContent = currency(
+      Number(card.estimated_value || 0) *
+      Math.max(1, Number(card.quantity || 1))
+    );
+
+    footer.append(status, value);
+    info.append(title, meta);
+
+    if (card.status === "want") {
+      const priority = document.createElement("span");
+      priority.className =
+        `show-priority ${card.wishlist_priority || "medium"}`;
+      priority.textContent =
+        `${titleCase(card.wishlist_priority || "medium")} priority` +
+        (card.wishlist_target_price !== null && card.wishlist_target_price !== undefined
+          ? ` • target ${currency(card.wishlist_target_price)}`
+          : "");
+      info.append(priority);
+    }
+
+    info.append(footer);
+    article.append(photo, info);
+
+    article.addEventListener("click", () => openCardDialog(card));
+    article.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openCardDialog(card);
+      }
+    });
+
+    elements.showModeGrid.append(article);
+  }
+
+  elements.showModeEmpty.classList.toggle("hidden", filtered.length > 0);
+}
 
 async function loadSetGoals() {
   if (!currentCollectionId) {
@@ -1467,6 +1643,8 @@ function exportCollectionCsv() {
       ["Grade", "grade"],
       ["Quantity", "quantity"],
       ["Status", "status"],
+      ["Wishlist Priority", "wishlist_priority"],
+      ["Wishlist Target Price", "wishlist_target_price"],
       ["Estimated Value", "estimated_value"],
       ["Purchase Price", "purchase_price"],
       ["Purchase Date", "purchase_date"],
@@ -1739,6 +1917,7 @@ function navigateTo(view) {
   const showTrade = view === "trade";
   const showScan = view === "scan";
   const showSets = view === "sets";
+  const showCardShow = view === "show";
 
   elements.homeView.classList.toggle("hidden", !showHome);
   elements.addView.classList.toggle("hidden", !showAdd);
@@ -1746,6 +1925,7 @@ function navigateTo(view) {
   elements.tradeView.classList.toggle("hidden", !showTrade);
   elements.scanView.classList.toggle("hidden", !showScan);
   elements.setsView.classList.toggle("hidden", !showSets);
+  elements.showView.classList.toggle("hidden", !showCardShow);
 
   for (const button of document.querySelectorAll(".nav-button")) {
     const isActive = button.dataset.view === view;
@@ -1772,6 +1952,10 @@ function navigateTo(view) {
 
   if (view === "sets") {
     renderSetGoals();
+  }
+
+  if (view === "show") {
+    renderCardShowMode();
   }
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1984,6 +2168,14 @@ function openCardDialog(card) {
   elements.detailValue.textContent = currency(card.estimated_value);
   elements.detailSport.textContent = card.sport || "Other";
   elements.detailStatus.textContent = String(card.status || "keep").replace("-", " ");
+  elements.detailWishlistPriority.textContent =
+    card.status === "want"
+      ? titleCase(card.wishlist_priority || "medium")
+      : "Not a wishlist card";
+  elements.detailWishlistTarget.textContent =
+    card.status === "want" && card.wishlist_target_price !== null && card.wishlist_target_price !== undefined
+      ? currency(card.wishlist_target_price)
+      : "Not set";
   renderCollectorBadges(elements.detailBadges, card);
   elements.detailLocation.textContent = card.storage_location || "Not specified";
   elements.detailParallel.textContent = card.parallel_name || "None";
@@ -2198,6 +2390,9 @@ function beginEditSelectedCard() {
   document.querySelector("#cardNumberInput").value = selectedCard.card_number || "";
   document.querySelector("#valueInput").value = selectedCard.estimated_value ?? 0;
   document.querySelector("#statusInput").value = selectedCard.status || "keep";
+  elements.wishlistPriorityInput.value = selectedCard.wishlist_priority || "medium";
+  elements.wishlistTargetInput.value = selectedCard.wishlist_target_price ?? "";
+  updateWishlistFields();
   document.querySelector("#locationInput").value = selectedCard.storage_location || "";
   document.querySelector("#notesInput").value = selectedCard.notes || "";
 
@@ -2437,7 +2632,10 @@ function resetCardForm() {
   elements.saveCardButton.textContent = "Save card";
   elements.quantityInput.value = "1";
   elements.conditionInput.value = "raw";
+  elements.wishlistPriorityInput.value = "medium";
+  elements.wishlistTargetInput.value = "";
   updateCollectorFieldVisibility();
+  updateWishlistFields();
 }
 
 function setSavingState(isSaving) {

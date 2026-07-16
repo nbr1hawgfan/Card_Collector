@@ -7,7 +7,7 @@
   <meta name="description" content="A private family sports card collection app.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/app.css?v=15">
+  <link rel="stylesheet" href="./css/app.css?v=16">
   <title>Rookie Vault</title>
 </head>
 <body>
@@ -64,6 +64,7 @@
           <div class="welcome-actions">
             <button id="homeAddButton" class="button" type="button">Add a card</button>
             <button id="homeSetsButton" class="button button-secondary" type="button">Set Tracker</button>
+            <button id="homeShowButton" class="button button-secondary" type="button">Card Show Mode</button>
           </div>
         </section>
 
@@ -236,6 +237,18 @@
             </select>
           </label>
 
+          <label id="wishlistPriorityLabel" class="hidden">Wishlist priority
+            <select id="wishlistPriorityInput">
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+
+          <label id="wishlistTargetLabel" class="hidden">Target price
+            <input id="wishlistTargetInput" type="number" min="0" step="0.01" inputmode="decimal">
+          </label>
+
           <fieldset class="wide collector-fieldset">
             <legend>Collector details</legend>
 
@@ -401,6 +414,54 @@
 
 
 
+
+
+      <section id="showView" class="app-view hidden">
+        <section class="panel show-mode-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow accent-text">Fast collector view</p>
+              <h2>Card Show Mode</h2>
+              <p class="muted">Large photos, quick filters, wishlist access, and trade cards ready for the show floor.</p>
+            </div>
+            <button id="exitShowModeButton" class="button button-secondary" type="button">Exit show mode</button>
+          </div>
+
+          <div class="show-kpi-grid">
+            <article class="show-kpi">
+              <span>Trade cards</span>
+              <strong id="showTradeCount">0</strong>
+            </article>
+            <article class="show-kpi">
+              <span>Duplicates</span>
+              <strong id="showDuplicateCount">0</strong>
+            </article>
+            <article class="show-kpi">
+              <span>Wishlist</span>
+              <strong id="showWishlistCount">0</strong>
+            </article>
+            <article class="show-kpi">
+              <span>High value</span>
+              <strong id="showHighValueCount">0</strong>
+            </article>
+          </div>
+
+          <div class="show-toolbar">
+            <div class="filter-row" id="showModeFilters">
+              <button class="filter-chip active" type="button" data-show-filter="trade">Trade</button>
+              <button class="filter-chip" type="button" data-show-filter="duplicate">Duplicates</button>
+              <button class="filter-chip" type="button" data-show-filter="want">Wishlist</button>
+              <button class="filter-chip" type="button" data-show-filter="high-value">High value</button>
+              <button class="filter-chip" type="button" data-show-filter="all">All cards</button>
+            </div>
+
+            <input id="showModeSearchInput" class="search" type="search" placeholder="Fast search...">
+          </div>
+
+          <div id="showModeGrid" class="show-mode-grid"></div>
+          <p id="showModeEmpty" class="empty-state">No cards match this show filter.</p>
+        </section>
+      </section>
 
       <section id="setsView" class="app-view hidden">
         <section class="panel">
@@ -777,6 +838,8 @@
         <dl class="detail-list">
           <div><dt>Sport</dt><dd id="detailSport"></dd></div>
           <div><dt>Status</dt><dd id="detailStatus"></dd></div>
+          <div><dt>Wishlist priority</dt><dd id="detailWishlistPriority"></dd></div>
+          <div><dt>Target price</dt><dd id="detailWishlistTarget"></dd></div>
           <div><dt>Storage</dt><dd id="detailLocation"></dd></div>
           <div><dt>Parallel</dt><dd id="detailParallel"></dd></div>
           <div><dt>Quantity</dt><dd id="detailQuantity"></dd></div>
@@ -824,6 +887,6 @@
     </article>
   </template>
 
-  <script type="module" src="./js/app.js?v=15"></script>
+  <script type="module" src="./js/app.js?v=16"></script>
 </body>
 </html>

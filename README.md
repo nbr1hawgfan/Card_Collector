@@ -1,10 +1,10 @@
-# Rookie Vault Set Tracker v1
+# Rookie Vault Card Show Mode + Wishlist Upgrade
 
 ## First: run the migration
 
 Run:
 
-- `supabase/set-tracker-migration.sql`
+- `supabase/wishlist-enhancements-migration.sql`
 
 in Supabase SQL Editor.
 
@@ -21,20 +21,19 @@ Keep:
 
 ## Adds
 
-- Set Tracker button on Home
-- Create, edit and delete set goals
-- Match owned cards automatically by year, brand, set and numeric card number
-- Completion percentage and progress bars
-- Owned and missing card-number grids
-- Select a missing number and prefill Add Card
-- Home dashboard set-progress summaries
-- Set-complete celebration state
-- PWA cache version `rookie-vault-v15`
+- Card Show Mode button on Home
+- Full-screen show-floor interface
+- Fast Trade, Duplicate, Wishlist, High Value, and All filters
+- Large mobile-first card photos
+- Fast search
+- Wishlist priority: Low, Medium, High
+- Wishlist target price
+- Wishlist priority and target shown in card details
+- Wishlist fields included in CSV/JSON backups
+- PWA cache version `rookie-vault-v16`
 
-## Important limitation
-
-Version 1 is designed for numbered base sets such as cards 1 through 220. It extracts the first numeric part of a card number. Insert sets and alphanumeric checklists will need a more advanced checklist mode later.
+High-value currently means an estimated value of $50 or more.
 
 Suggested commit:
 
-`Add automatic set tracker and missing card goals`
+`Add card show mode and wishlist priorities`
