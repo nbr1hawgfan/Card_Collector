@@ -46,11 +46,32 @@ const elements = {
   totalCards: document.querySelector("#totalCards"),
   totalValue: document.querySelector("#totalValue"),
   tradeCount: document.querySelector("#tradeCount"),
+  rookieCount: document.querySelector("#rookieCount"),
+  autographCount: document.querySelector("#autographCount"),
+  gradedCount: document.querySelector("#gradedCount"),
+  numberedCount: document.querySelector("#numberedCount"),
+  missingValueCount: document.querySelector("#missingValueCount"),
+  missingPhotoCount: document.querySelector("#missingPhotoCount"),
   cardTemplate: document.querySelector("#cardTemplate"),
   frontPhotoInput: document.querySelector("#frontPhotoInput"),
   backPhotoInput: document.querySelector("#backPhotoInput"),
   frontPreview: document.querySelector("#frontPreview"),
   backPreview: document.querySelector("#backPreview"),
+  rookieInput: document.querySelector("#rookieInput"),
+  autographInput: document.querySelector("#autographInput"),
+  memorabiliaInput: document.querySelector("#memorabiliaInput"),
+  numberedInput: document.querySelector("#numberedInput"),
+  numberedFields: document.querySelector("#numberedFields"),
+  serialNumberInput: document.querySelector("#serialNumberInput"),
+  printRunInput: document.querySelector("#printRunInput"),
+  parallelInput: document.querySelector("#parallelInput"),
+  quantityInput: document.querySelector("#quantityInput"),
+  conditionInput: document.querySelector("#conditionInput"),
+  gradingFields: document.querySelector("#gradingFields"),
+  gradingCompanyInput: document.querySelector("#gradingCompanyInput"),
+  gradeInput: document.querySelector("#gradeInput"),
+  purchasePriceInput: document.querySelector("#purchasePriceInput"),
+  purchaseDateInput: document.querySelector("#purchaseDateInput"),
   cardDialog: document.querySelector("#cardDialog"),
   closeDialogButton: document.querySelector("#closeDialogButton"),
   detailPhoto: document.querySelector("#detailPhoto"),
@@ -63,7 +84,11 @@ const elements = {
   detailValue: document.querySelector("#detailValue"),
   detailSport: document.querySelector("#detailSport"),
   detailStatus: document.querySelector("#detailStatus"),
+  detailBadges: document.querySelector("#detailBadges"),
   detailLocation: document.querySelector("#detailLocation"),
+  detailParallel: document.querySelector("#detailParallel"),
+  detailQuantity: document.querySelector("#detailQuantity"),
+  detailPurchase: document.querySelector("#detailPurchase"),
   detailNotes: document.querySelector("#detailNotes"),
   activeDetailActions: document.querySelector("#activeDetailActions"),
   trashDetailActions: document.querySelector("#trashDetailActions"),
@@ -106,6 +131,7 @@ async function init() {
   }
 
   bindEvents();
+  updateCollectorFieldVisibility();
 
   const { data, error } = await supabase.auth.getSession();
   if (error) console.error("Could not read session:", error);
@@ -160,6 +186,9 @@ function bindEvents() {
   elements.backPhotoInput.addEventListener("change", () =>
     previewSelectedPhoto(elements.backPhotoInput, elements.backPreview)
   );
+
+  elements.numberedInput.addEventListener("change", updateCollectorFieldVisibility);
+  elements.conditionInput.addEventListener("change", updateCollectorFieldVisibility);
 
   elements.closeDialogButton.addEventListener("click", closeCardDialog);
   elements.showFrontButton.addEventListener("click", () => setDetailSide("front"));
@@ -386,6 +415,25 @@ async function saveCard(event) {
       status: valueOf("#statusInput"),
       storage_location: valueOf("#locationInput") || null,
       notes: valueOf("#notesInput") || null,
+      is_rookie: elements.rookieInput.checked,
+      is_autograph: elements.autographInput.checked,
+      is_memorabilia: elements.memorabiliaInput.checked,
+      is_numbered: elements.numberedInput.checked,
+      serial_number: numberOrNull(elements.serialNumberInput.value),
+      print_run: numberOrNull(elements.printRunInput.value),
+      parallel_name: elements.parallelInput.value.trim() || null,
+      quantity: Math.max(1, numberOrNull(elements.quantityInput.value) || 1),
+      card_condition: elements.conditionInput.value,
+      grading_company:
+        elements.conditionInput.value === "graded"
+          ? elements.gradingCompanyInput.value || null
+          : null,
+      grade:
+        elements.conditionInput.value === "graded"
+          ? elements.gradeInput.value.trim() || null
+          : null,
+      purchase_price: numberOrNull(elements.purchasePriceInput.value),
+      purchase_date: elements.purchaseDateInput.value || null,
       front_photo_path: frontPhotoPath,
       back_photo_path: backPhotoPath
     };
@@ -669,6 +717,11 @@ function renderCards() {
     fragment.querySelector(".card-status").textContent =
       String(card.status || "keep").replace("-", " ");
 
+    renderCollectorBadges(
+      fragment.querySelector(".collector-badges"),
+      card
+    );
+
     cardElement.addEventListener("click", () => openCardDialog(card));
     cardElement.addEventListener("keydown", event => {
       if (event.key === "Enter" || event.key === " ") {
@@ -694,6 +747,18 @@ function renderCards() {
   elements.tradeCount.textContent =
     activeCards.filter(card => card.status === "trade").length;
   elements.trashCount.textContent = deletedCards.length;
+  elements.rookieCount.textContent =
+    activeCards.filter(card => card.is_rookie).length;
+  elements.autographCount.textContent =
+    activeCards.filter(card => card.is_autograph).length;
+  elements.gradedCount.textContent =
+    activeCards.filter(card => card.card_condition === "graded").length;
+  elements.numberedCount.textContent =
+    activeCards.filter(card => card.is_numbered).length;
+  elements.missingValueCount.textContent =
+    activeCards.filter(card => Number(card.estimated_value || 0) <= 0).length;
+  elements.missingPhotoCount.textContent =
+    activeCards.filter(card => !card.front_photo_path).length;
   renderRecentCards(activeCards);
 
   elements.sportFilters.classList.toggle("hidden", collectionView === "trash");
@@ -716,7 +781,11 @@ function openCardDialog(card) {
   elements.detailValue.textContent = currency(card.estimated_value);
   elements.detailSport.textContent = card.sport || "Other";
   elements.detailStatus.textContent = String(card.status || "keep").replace("-", " ");
+  renderCollectorBadges(elements.detailBadges, card);
   elements.detailLocation.textContent = card.storage_location || "Not specified";
+  elements.detailParallel.textContent = card.parallel_name || "None";
+  elements.detailQuantity.textContent = String(card.quantity || 1);
+  elements.detailPurchase.textContent = formatPurchase(card);
   elements.detailNotes.textContent = card.notes || "No notes";
 
   const isDeleted = Boolean(card.deleted_at);
@@ -774,6 +843,21 @@ function beginEditSelectedCard() {
   document.querySelector("#statusInput").value = selectedCard.status || "keep";
   document.querySelector("#locationInput").value = selectedCard.storage_location || "";
   document.querySelector("#notesInput").value = selectedCard.notes || "";
+
+  elements.rookieInput.checked = Boolean(selectedCard.is_rookie);
+  elements.autographInput.checked = Boolean(selectedCard.is_autograph);
+  elements.memorabiliaInput.checked = Boolean(selectedCard.is_memorabilia);
+  elements.numberedInput.checked = Boolean(selectedCard.is_numbered);
+  elements.serialNumberInput.value = selectedCard.serial_number ?? "";
+  elements.printRunInput.value = selectedCard.print_run ?? "";
+  elements.parallelInput.value = selectedCard.parallel_name || "";
+  elements.quantityInput.value = selectedCard.quantity ?? 1;
+  elements.conditionInput.value = selectedCard.card_condition || "raw";
+  elements.gradingCompanyInput.value = selectedCard.grading_company || "";
+  elements.gradeInput.value = selectedCard.grade || "";
+  elements.purchasePriceInput.value = selectedCard.purchase_price ?? "";
+  elements.purchaseDateInput.value = selectedCard.purchase_date || "";
+  updateCollectorFieldVisibility();
 
   showExistingPreview(
     elements.frontPreview,
@@ -902,6 +986,80 @@ async function permanentlyDeleteSelectedCard() {
   setCardMessage("Card permanently deleted.");
 }
 
+
+function updateCollectorFieldVisibility() {
+  elements.numberedFields.classList.toggle(
+    "hidden",
+    !elements.numberedInput.checked
+  );
+
+  elements.gradingFields.classList.toggle(
+    "hidden",
+    elements.conditionInput.value !== "graded"
+  );
+}
+
+function renderCollectorBadges(container, card) {
+  container.replaceChildren();
+
+  const badges = [];
+
+  if (card.is_rookie) badges.push(["RC", false]);
+  if (card.is_autograph) badges.push(["AUTO", false]);
+  if (card.is_memorabilia) badges.push(["PATCH", false]);
+
+  if (card.is_numbered) {
+    const serialText =
+      card.serial_number && card.print_run
+        ? `${card.serial_number}/${card.print_run}`
+        : card.print_run
+          ? `/${card.print_run}`
+          : "NUMBERED";
+    badges.push([serialText, false]);
+  }
+
+  if (card.card_condition === "graded") {
+    const gradeText = [card.grading_company, card.grade]
+      .filter(Boolean)
+      .join(" ");
+    badges.push([gradeText || "GRADED", false]);
+  }
+
+  if (card.parallel_name) {
+    badges.push([card.parallel_name, true]);
+  }
+
+  for (const [label, alternate] of badges) {
+    const badge = document.createElement("span");
+    badge.className = `collector-badge${alternate ? " alt" : ""}`;
+    badge.textContent = label;
+    container.append(badge);
+  }
+}
+
+function formatPurchase(card) {
+  const parts = [];
+
+  if (card.purchase_price !== null && card.purchase_price !== undefined) {
+    parts.push(currency(card.purchase_price));
+  }
+
+  if (card.purchase_date) {
+    const parsed = new Date(`${card.purchase_date}T00:00:00`);
+    if (!Number.isNaN(parsed.getTime())) {
+      parts.push(
+        parsed.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric"
+        })
+      );
+    }
+  }
+
+  return parts.length ? parts.join(" • ") : "Not recorded";
+}
+
 function resetCardForm() {
   elements.cardForm.reset();
 
@@ -920,6 +1078,9 @@ function resetCardForm() {
   elements.cancelEditButton.classList.add("hidden");
   elements.cancelEditButtonBottom.classList.add("hidden");
   elements.saveCardButton.textContent = "Save card";
+  elements.quantityInput.value = "1";
+  elements.conditionInput.value = "raw";
+  updateCollectorFieldVisibility();
 }
 
 function setSavingState(isSaving) {

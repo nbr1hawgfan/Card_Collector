@@ -7,7 +7,7 @@
   <meta name="description" content="A private family sports card collection app.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/app.css?v=8">
+  <link rel="stylesheet" href="./css/app.css?v=9">
   <title>Rookie Vault</title>
 </head>
 <body>
@@ -76,6 +76,33 @@
         <article class="stat-card">
           <span>For trade</span>
           <strong id="tradeCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Rookie cards</span>
+          <strong id="rookieCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Autographs</span>
+          <strong id="autographCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Graded cards</span>
+          <strong id="gradedCount">0</strong>
+        </article>
+      </section>
+
+      <section class="health-grid">
+        <article class="health-card">
+          <span>Numbered cards</span>
+          <strong id="numberedCount">0</strong>
+        </article>
+        <article class="health-card">
+          <span>Missing values</span>
+          <strong id="missingValueCount">0</strong>
+        </article>
+        <article class="health-card">
+          <span>Missing front photos</span>
+          <strong id="missingPhotoCount">0</strong>
         </article>
       </section>
 
@@ -150,6 +177,83 @@
               <option value="want">Want list</option>
             </select>
           </label>
+
+          <fieldset class="wide collector-fieldset">
+            <legend>Collector details</legend>
+
+            <div class="collector-grid">
+              <label class="check-card">
+                <input id="rookieInput" type="checkbox">
+                <span>Rookie card</span>
+              </label>
+
+              <label class="check-card">
+                <input id="autographInput" type="checkbox">
+                <span>Autograph</span>
+              </label>
+
+              <label class="check-card">
+                <input id="memorabiliaInput" type="checkbox">
+                <span>Patch / memorabilia</span>
+              </label>
+
+              <label class="check-card">
+                <input id="numberedInput" type="checkbox">
+                <span>Serial numbered</span>
+              </label>
+            </div>
+
+            <div id="numberedFields" class="form-grid nested-fields hidden">
+              <label>Serial number
+                <input id="serialNumberInput" inputmode="numeric" placeholder="23">
+              </label>
+              <label>Print run
+                <input id="printRunInput" inputmode="numeric" placeholder="99">
+              </label>
+            </div>
+
+            <div class="form-grid nested-fields">
+              <label>Parallel / variation
+                <input id="parallelInput" maxlength="120" placeholder="Silver, Refractor, Gold...">
+              </label>
+
+              <label>Quantity
+                <input id="quantityInput" type="number" min="1" step="1" value="1" inputmode="numeric">
+              </label>
+
+              <label>Condition
+                <select id="conditionInput">
+                  <option value="raw">Raw</option>
+                  <option value="graded">Graded</option>
+                </select>
+              </label>
+
+              <label>Purchase price
+                <input id="purchasePriceInput" type="number" min="0" step="0.01" inputmode="decimal">
+              </label>
+
+              <label>Purchase date
+                <input id="purchaseDateInput" type="date">
+              </label>
+            </div>
+
+            <div id="gradingFields" class="form-grid nested-fields hidden">
+              <label>Grading company
+                <select id="gradingCompanyInput">
+                  <option value="">Select</option>
+                  <option>PSA</option>
+                  <option>BGS</option>
+                  <option>SGC</option>
+                  <option>CGC</option>
+                  <option>Other</option>
+                </select>
+              </label>
+
+              <label>Grade
+                <input id="gradeInput" maxlength="20" placeholder="10">
+              </label>
+            </div>
+          </fieldset>
 
           <fieldset class="wide photo-fieldset">
             <legend>Card photos</legend>
@@ -278,6 +382,7 @@
         <p id="detailMeta" class="card-meta"></p>
         <h2 id="detailPlayer"></h2>
         <p id="detailSet" class="detail-set"></p>
+        <div id="detailBadges" class="detail-badges"></div>
 
         <div class="detail-value-block">
           <span>Estimated value</span>
@@ -288,6 +393,9 @@
           <div><dt>Sport</dt><dd id="detailSport"></dd></div>
           <div><dt>Status</dt><dd id="detailStatus"></dd></div>
           <div><dt>Storage</dt><dd id="detailLocation"></dd></div>
+          <div><dt>Parallel</dt><dd id="detailParallel"></dd></div>
+          <div><dt>Quantity</dt><dd id="detailQuantity"></dd></div>
+          <div><dt>Purchase</dt><dd id="detailPurchase"></dd></div>
           <div><dt>Notes</dt><dd id="detailNotes"></dd></div>
         </dl>
 
@@ -325,10 +433,11 @@
           <span class="badge card-sport"></span>
           <span class="badge card-status"></span>
         </div>
+        <div class="collector-badges"></div>
       </div>
     </article>
   </template>
 
-  <script type="module" src="./js/app.js?v=8"></script>
+  <script type="module" src="./js/app.js?v=9"></script>
 </body>
 </html>

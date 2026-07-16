@@ -1,6 +1,12 @@
-# Rookie Vault Dashboard + Navigation Upgrade
+# Rookie Vault Collector Details Upgrade
 
-Replace:
+## First: run the database migration
+
+In Supabase SQL Editor, run:
+
+`supabase/collector-details-migration.sql`
+
+## Then replace these files
 
 - `index.html`
 - `css/app.css`
@@ -13,17 +19,25 @@ Keep:
 
 ## Adds
 
-- Real Home dashboard
-- Welcome card
-- Recent cards section
-- Fixed mobile bottom navigation
-- Home, Collection, Add and Trash screens
-- Add-card shortcut
-- View-all shortcut
-- Editing automatically opens the Add/Edit screen
-- Saving returns to Home
-- PWA cache version `rookie-vault-v8`
+- Rookie card flag
+- Autograph flag
+- Patch / memorabilia flag
+- Serial numbered cards
+- Serial number and print run
+- Parallel / variation
+- Quantity
+- Raw or graded status
+- PSA, BGS, SGC, CGC or Other grading company
+- Grade
+- Purchase price
+- Purchase date
+- Collector badges on collection cards
+- Collector badges in full card details
+- Dashboard counts for rookie, autograph, graded and numbered cards
+- Collection health counts for missing values and missing front photos
+- Full edit support for all new fields
+- PWA cache version `rookie-vault-v9`
 
 Suggested commit:
 
-`Add dashboard and mobile navigation`
+`Add collector fields badges and statistics`
