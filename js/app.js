@@ -664,8 +664,8 @@ async function analyzeScannedCard() {
   try {
     scanOcrWorker=await createWorker("eng",1,{logger:m=>{if(m.status==="recognizing text")setScanProgress(15+Math.round((m.progress||0)*70),`Reading card text... ${Math.round((m.progress||0)*100)}%`)}});
     let frontText="",backText="";
-    if(front){setScanProgress(10,"Preparing front photo...");frontText=(await scanOcrWorker.recognize(await prepareOcrImage(front))).data.text||""}
-    if(back){setScanProgress(front?55:10,"Preparing back photo...");backText=(await scanOcrWorker.recognize(await prepareOcrImage(back))).data.text||""}
+    if(front){setScanProgress(10,"Preparing front photo...");frontText = await recognizeBestText(front, "front")}
+    if(back){setScanProgress(front?55:10,"Preparing back photo...");backText = await recognizeBestText(back, "back")}
     setScanProgress(94,"Building suggestions...");
     populateScanSuggestions(parseCardText(frontText,backText),frontText,backText);
     setScanProgress(100,"Analysis complete."); setTimeout(()=>elements.scanProgressWrap.classList.add("hidden"),700);
@@ -678,10 +678,70 @@ async function analyzeScannedCard() {
   }
 }
 
-async function prepareOcrImage(file) {
-  const bitmap=await createImageBitmap(file),max=1800,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));
-  const canvas=document.createElement("canvas");canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
-  const ctx=canvas.getContext("2d",{alpha:false});ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.filter="grayscale(1) contrast(1.35)";ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas;
+async function prepareOcrImage(file, mode = "contrast") {
+  const bitmap = await createImageBitmap(file);
+  const max = 1800;
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+  const ctx = canvas.getContext("2d", { alpha: false });
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (mode === "contrast") {
+    ctx.filter = "grayscale(1) contrast(1.45) brightness(1.08)";
+  } else {
+    ctx.filter = "contrast(1.12) saturate(.85)";
+  }
+
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return canvas;
+}
+
+
+async function recognizeBestText(file, label) {
+  const variants = [
+    ["contrast", "high contrast"],
+    ["natural", "natural color"]
+  ];
+
+  let best = { text: "", score: -1 };
+
+  for (let index = 0; index < variants.length; index += 1) {
+    const [mode, description] = variants[index];
+    setScanProgress(
+      12 + index * 30,
+      `Reading ${label} using ${description}...`
+    );
+
+    const image = await prepareOcrImage(file, mode);
+    const result = await scanOcrWorker.recognize(image);
+    const text = result.data.text || "";
+    const score = scoreOcrText(text);
+
+    if (score > best.score) {
+      best = { text, score };
+    }
+  }
+
+  return best.text;
+}
+
+function scoreOcrText(text) {
+  const normalized = String(text || "");
+  let score = normalized.replace(/\s/g, "").length * 0.05;
+
+  if (/\b(19[5-9]\d|20[0-3]\d)\b/.test(normalized)) score += 8;
+  if (/\b(TOPPS|PANINI|BOWMAN|UPPER\s+DECK|DONRUSS|FLEER|LEAF)\b/i.test(normalized)) score += 8;
+  if (/(?:CARD\s*(?:NO|NUMBER|#)?\.?\s*|NO\.?\s*|#\s*)[A-Z]{0,4}-?\d{1,4}/i.test(normalized)) score += 10;
+  if (/\b(RC|ROOKIE)\b/i.test(normalized)) score += 3;
+  if (normalized.split(/\s+/).filter(Boolean).length >= 8) score += 5;
+
+  return score;
 }
 
 function parseCardText(frontText,backText) {
@@ -690,9 +750,21 @@ function parseCardText(frontText,backText) {
   const years=[...text.matchAll(/\b(19[5-9]\d|20[0-3]\d)\b/g)].map(m=>+m[1]).filter(y=>y<=new Date().getFullYear()+1);
   const year=years.length?Math.max(...years):"";
   const find=(pairs)=>pairs.find(([,r])=>r.test(text))?.[0]||"";
-  const brand=find([["Topps",/\bTOPPS\b/i],["Panini",/\bPANINI\b/i],["Upper Deck",/\bUPPER\s+DECK\b/i],["Bowman",/\bBOWMAN\b/i],["Donruss",/\bDONRUSS\b/i],["Fleer",/\bFLEER\b/i],["Leaf",/\bLEAF\b/i]]);
-  const setName=find([["Chrome",/\bCHROME\b/i],["Prizm",/\bPRIZM\b/i],["Mosaic",/\bMOSAIC\b/i],["Select",/\bSELECT\b/i],["Heritage",/\bHERITAGE\b/i],["Optic",/\bOPTIC\b/i],["Stadium Club",/\bSTADIUM\s+CLUB\b/i],["Series 1",/\bSERIES\s+1\b/i],["Series 2",/\bSERIES\s+2\b/i]]);
-  const num=(text.match(/(?:CARD\s*(?:NO|NUMBER|#)?\.?\s*|NO\.?\s*|#\s*)([A-Z]{0,4}-?\d{1,4})\b/i)||[])[1]||"";
+  const brand=find([["Topps",/\bTOPPS\b/i],["Panini",/\bPANINI\b/i],["Upper Deck",/\bUPPER\s+DECK\b/i],["Bowman",/\bBOWMAN\b/i],["Donruss",/\bDONRUSS\b/i],["Fleer",/\bFLEER\b/i],["Leaf",/\bLEAF\b/i],["Score",/\bSCORE\b/i],["Prestige",/\bPRESTIGE\b/i]]);
+  const setName=find([["Chrome",/\bCHROME\b/i],["Prizm",/\bPRIZM\b/i],["Mosaic",/\bMOSAIC\b/i],["Select",/\bSELECT\b/i],["Heritage",/\bHERITAGE\b/i],["Optic",/\bOPTIC\b/i],["Stadium Club",/\bSTADIUM\s+CLUB\b/i],["Series 1",/\bSERIES\s+1\b/i],["Series 2",/\bSERIES\s+2\b/i],["Prestige",/\bPRESTIGE\b/i],["Heroes",/\bHEROES\b/i],["Contenders",/\bCONTENDERS\b/i]]);
+  const numberPatterns = [
+    /(?:CARD\s*(?:NO|NUMBER|#)?\.?\s*|NO\.?\s*|#\s*)([A-Z]{0,5}-?\d{1,5})\b/i,
+    /\b(?:CARD\s*)?([A-Z]{1,5}-\d{1,5})\b/i,
+    /\b([A-Z]{0,3}\d{1,4})\s*\/\s*\d{1,4}\b/i
+  ];
+  let num = "";
+  for (const pattern of numberPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      num = match[1];
+      break;
+    }
+  }
   const parallel=find([["Silver",/\bSILVER\b/i],["Gold",/\bGOLD\b/i],["Refractor",/\bREFRACTOR\b/i],["Holo",/\bHOLO\b/i],["Blue",/\bBLUE\b/i],["Red",/\bRED\b/i],["Green",/\bGREEN\b/i],["Purple",/\bPURPLE\b/i]]);
   const sport=detectSport(upper), rookie=/\b(RC|ROOKIE)\b/i.test(text);
   const reject=/TOPPS|PANINI|BOWMAN|CHROME|PRIZM|MOSAIC|SELECT|BASEBALL|BASKETBALL|FOOTBALL|HOCKEY|SOCCER|ROOKIE|CARD|COPYRIGHT|AUTHENTIC/i;
@@ -1273,7 +1345,14 @@ function navigateTo(view) {
   elements.scanView.classList.toggle("hidden", !showScan);
 
   for (const button of document.querySelectorAll(".nav-button")) {
-    button.classList.toggle("active", button.dataset.view === view);
+    const isActive = button.dataset.view === view;
+    button.classList.toggle("active", isActive);
+
+    if (isActive) {
+      button.setAttribute("aria-current", "page");
+    } else {
+      button.removeAttribute("aria-current");
+    }
   }
 
   if (view === "collection") {

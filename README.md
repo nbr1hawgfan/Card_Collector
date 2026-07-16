@@ -1,26 +1,31 @@
-# Rookie Vault Scan Assistant v1
+# Rookie Vault Navigation + OCR Tuning Fix
 
 No Supabase migration is required.
 
 Replace:
+
 - `index.html`
 - `css/app.css`
 - `js/app.js`
 - `sw.js`
 
-Keep `js/config.js`.
+Keep:
 
-## Adds
-- Scan tab with front/back camera capture
-- Free in-browser OCR using Tesseract.js
-- Progress bar and raw OCR text
-- Suggested player, year, brand, set, card number, sport, parallel and rookie status
-- Confidence label
-- Possible duplicate detection and quantity increase
-- Sold-listing search
-- One-tap transfer of details and photos into Add Card
-- PWA cache version `rookie-vault-v13`
+- `js/config.js`
 
-OCR is an assistant, not guaranteed identification. Foil, glare, tiny text and unusual fonts can reduce accuracy. The first scan takes longer because OCR language data must download.
+## Fixes
 
-Suggested commit: `Add free OCR scan assistant and duplicate detection`
+- Only one bottom-navigation button is highlighted at a time
+- Scan is no longer permanently styled as selected
+- Active navigation now uses `aria-current`
+- OCR tries both high-contrast and natural-color image processing
+- Rookie Vault keeps the OCR result with the stronger useful-text score
+- Expanded card-number patterns
+- Added Score, Prestige, Heroes and Contenders recognition
+- PWA cache version `rookie-vault-v14`
+
+The extra OCR pass may take somewhat longer, but should improve difficult cards. OCR will still struggle with foil glare, highly stylized names, tiny text and sideways card designs.
+
+Suggested commit:
+
+`Fix navigation highlight and improve OCR accuracy`

@@ -1334,3 +1334,22 @@ body {
 .ocr-details{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--border)}.ocr-details summary{color:var(--muted);font-weight:800;cursor:pointer}
 .ocr-text-grid{margin-top:.75rem}.ocr-text-grid section{min-width:0;padding:.75rem;border:1px solid var(--border);border-radius:11px;background:var(--surface)}.ocr-text-grid h4{margin:0 0 .45rem}.ocr-text-grid pre{max-height:240px;margin:0;overflow:auto;color:var(--muted);white-space:pre-wrap;word-break:break-word;font-size:.76rem}
 @media(max-width:840px){.scan-layout,.scan-photo-grid,.scan-suggestion-grid,.ocr-text-grid{grid-template-columns:1fr}.scan-result-heading{align-items:stretch;flex-direction:column}}
+
+
+/* Navigation selection fix + OCR tuning release — v14 */
+
+.nav-button-primary:not(.active) {
+  color: var(--muted);
+  background: transparent;
+}
+
+.nav-button.active {
+  color: #ffffff;
+  background: var(--accent);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.nav-button:not(.active):hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
