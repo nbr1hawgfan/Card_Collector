@@ -1,4 +1,4 @@
-# Rookie Vault Search-First Add Card
+# Rookie Vault CardSight Mapping Fix
 
 No Supabase migration is required.
 
@@ -13,31 +13,21 @@ Replace:
 Keep:
 - `js/config.js`
 
-## New recommended workflow
+## Fixes
 
-1. Open **Lookup**.
-2. Enter player name.
-3. Optionally enter year, sport, and brand/set.
-4. Search CardSight.
-5. Select the exact catalog result.
-6. Rookie Vault fills the Add Card form.
-7. Add front and back photos.
-8. Review and save.
-
-## What is populated
-
-- Player
-- Year
-- Manufacturer/brand
-- Set or release
-- Card number
-- Parallel
-- Serial print run when supplied
-- Possible rookie status
-- Recent-sales value when CardSight pricing is available
-
-OCR and photo identification remain under **Optional photo and OCR tools**, but are no longer the primary workflow.
+- Preserves the original search-result data when full CardSight details are loaded
+- Merges search results and full card records instead of replacing one with the other
+- Reads alternate CardSight field names and nested objects
+- Correctly maps year from year, cardYear, releaseYear, or release.year
+- Correctly maps brand from manufacturer, brand, manufacturerName, or release data
+- Correctly maps set/release names
+- Correctly maps card number aliases
+- Correctly maps parallel/variant/variation fields
+- Correctly maps numbered-to / print-run fields
+- Falls back to structured `fields` metadata when direct properties are absent
+- Uses the same mapping logic for result display and Add Card population
+- PWA cache version v20
 
 Suggested commit:
 
-`Add search first CardSight card entry workflow`
+`Fix CardSight year brand and parallel mapping`

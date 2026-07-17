@@ -1410,19 +1410,23 @@ function renderLookupResults(results) {
     title.textContent = CardSightSdk.formatCardDisplay
       ? CardSightSdk.formatCardDisplay(item)
       : [
-          item.year,
-          item.manufacturer,
-          item.name
+          getCardSightYear(item),
+          getCardSightBrand(item),
+          getCardSightPlayer(item)
         ].filter(Boolean).join(" ");
 
     const details = document.createElement("span");
+    const resultSet = getCardSightSet(item);
+    const resultNumber = getCardSightNumber(item);
+    const resultParallel = getCardSightParallelName(item);
+    const resultPrintRun = getCardSightPrintRun(item);
+
     details.textContent = [
-      item.releaseName,
-      item.setName,
-      item.number ? `#${item.number}` : null,
-      item.parallel?.name,
-      item.parallel?.numberedTo
-        ? `numbered /${item.parallel.numberedTo}`
+      resultSet,
+      resultNumber ? `#${resultNumber}` : null,
+      resultParallel,
+      resultPrintRun
+        ? `numbered /${resultPrintRun}`
         : null
     ].filter(Boolean).join(" • ") || "Open the match to review full details.";
 
@@ -1469,14 +1473,12 @@ async function selectLookupCardForAdd(item) {
 
   try {
     const client = createCardSightClient();
-    let card = item;
+    let fullCard = null;
 
     if (item.id) {
       try {
         const response = await client.catalog.cards.get(item.id);
-        if (response?.data) {
-          card = response.data;
-        }
+        fullCard = response?.data || null;
       } catch (error) {
         console.warn(
           "Full card record was unavailable; using the search result.",
@@ -1484,6 +1486,11 @@ async function selectLookupCardForAdd(item) {
         );
       }
     }
+
+    // Important: search results and full card records do not always use
+    // the same property names. Keep the search result and merge the full
+    // response over it rather than replacing the search result entirely.
+    const card = mergeCardSightCardData(item, fullCard);
 
     resetCardForm();
     populateAddFormFromCardSight(card);
@@ -1500,7 +1507,7 @@ async function selectLookupCardForAdd(item) {
     navigateTo("add");
 
     const player =
-      card.name ||
+      getCardSightPlayer(card) ||
       elements.lookupPlayerInput.value.trim() ||
       "selected card";
 
@@ -1523,17 +1530,301 @@ async function selectLookupCardForAdd(item) {
   }
 }
 
+function mergeCardSightCardData(searchItem, fullCard) {
+  if (!fullCard) return { ...searchItem };
+
+  return {
+    ...searchItem,
+    ...fullCard,
+
+    // Preserve useful search-result values when full details omit them.
+    id: fullCard.id || searchItem.id,
+    name:
+      fullCard.name ||
+      fullCard.playerName ||
+      fullCard.player?.name ||
+      searchItem.name ||
+      searchItem.playerName ||
+      searchItem.player?.name,
+
+    year:
+      fullCard.year ??
+      fullCard.cardYear ??
+      fullCard.releaseYear ??
+      fullCard.release?.year ??
+      searchItem.year ??
+      searchItem.cardYear ??
+      searchItem.releaseYear ??
+      searchItem.release?.year,
+
+    manufacturer:
+      fullCard.manufacturer ||
+      fullCard.brand ||
+      fullCard.manufacturerName ||
+      fullCard.release?.manufacturer ||
+      fullCard.release?.brand ||
+      searchItem.manufacturer ||
+      searchItem.brand ||
+      searchItem.manufacturerName ||
+      searchItem.release?.manufacturer ||
+      searchItem.release?.brand,
+
+    releaseName:
+      fullCard.releaseName ||
+      fullCard.release?.name ||
+      fullCard.productName ||
+      searchItem.releaseName ||
+      searchItem.release?.name ||
+      searchItem.productName,
+
+    setName:
+      fullCard.setName ||
+      fullCard.set?.name ||
+      fullCard.subsetName ||
+      searchItem.setName ||
+      searchItem.set?.name ||
+      searchItem.subsetName,
+
+    number:
+      fullCard.number ||
+      fullCard.cardNumber ||
+      fullCard.card_no ||
+      searchItem.number ||
+      searchItem.cardNumber ||
+      searchItem.card_no,
+
+    parallel: mergeCardSightParallel(
+      searchItem.parallel,
+      fullCard.parallel,
+      searchItem,
+      fullCard
+    ),
+
+    fields: [
+      ...(Array.isArray(searchItem.fields) ? searchItem.fields : []),
+      ...(Array.isArray(fullCard.fields) ? fullCard.fields : [])
+    ]
+  };
+}
+
+function mergeCardSightParallel(searchParallel, fullParallel, searchItem, fullCard) {
+  const searchName =
+    searchParallel?.name ||
+    searchItem.parallelName ||
+    searchItem.variant ||
+    searchItem.variation ||
+    searchItem.parallel;
+
+  const fullName =
+    fullParallel?.name ||
+    fullCard.parallelName ||
+    fullCard.variant ||
+    fullCard.variation ||
+    fullCard.parallel;
+
+  const numberedTo =
+    fullParallel?.numberedTo ??
+    fullParallel?.printRun ??
+    fullCard.numberedTo ??
+    fullCard.printRun ??
+    fullCard.serialNumberedTo ??
+    searchParallel?.numberedTo ??
+    searchParallel?.printRun ??
+    searchItem.numberedTo ??
+    searchItem.printRun ??
+    searchItem.serialNumberedTo ??
+    null;
+
+  const name =
+    typeof fullName === "string"
+      ? fullName
+      : typeof searchName === "string"
+        ? searchName
+        : fullParallel?.name ||
+          searchParallel?.name ||
+          "";
+
+  return {
+    ...(typeof searchParallel === "object" && searchParallel
+      ? searchParallel
+      : {}),
+    ...(typeof fullParallel === "object" && fullParallel
+      ? fullParallel
+      : {}),
+    name,
+    numberedTo
+  };
+}
+
+function getCardSightPlayer(card) {
+  return (
+    card.name ||
+    card.playerName ||
+    card.player?.name ||
+    getCardSightField(card, [
+      "player",
+      "player name",
+      "athlete",
+      "athlete name",
+      "subject"
+    ]) ||
+    ""
+  );
+}
+
+function getCardSightYear(card) {
+  return (
+    card.year ??
+    card.cardYear ??
+    card.releaseYear ??
+    card.release?.year ??
+    getCardSightField(card, [
+      "year",
+      "card year",
+      "release year"
+    ]) ??
+    ""
+  );
+}
+
+function getCardSightBrand(card) {
+  return (
+    card.manufacturer ||
+    card.brand ||
+    card.manufacturerName ||
+    card.release?.manufacturer ||
+    card.release?.brand ||
+    getCardSightField(card, [
+      "manufacturer",
+      "brand",
+      "company"
+    ]) ||
+    ""
+  );
+}
+
+function getCardSightSet(card) {
+  return (
+    card.setName ||
+    card.set?.name ||
+    card.releaseName ||
+    card.release?.name ||
+    card.productName ||
+    getCardSightField(card, [
+      "set",
+      "set name",
+      "release",
+      "release name",
+      "product"
+    ]) ||
+    ""
+  );
+}
+
+function getCardSightNumber(card) {
+  return (
+    card.number ||
+    card.cardNumber ||
+    card.card_no ||
+    getCardSightField(card, [
+      "number",
+      "card number",
+      "card no",
+      "card #"
+    ]) ||
+    ""
+  );
+}
+
+function getCardSightParallelName(card) {
+  const direct =
+    card.parallel?.name ||
+    card.parallelName ||
+    card.variant ||
+    card.variation;
+
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim();
+  }
+
+  return (
+    getCardSightField(card, [
+      "parallel",
+      "parallel name",
+      "variant",
+      "variation"
+    ]) ||
+    ""
+  );
+}
+
+function getCardSightPrintRun(card) {
+  const direct =
+    card.parallel?.numberedTo ??
+    card.parallel?.printRun ??
+    card.numberedTo ??
+    card.printRun ??
+    card.serialNumberedTo;
+
+  if (direct !== null && direct !== undefined && direct !== "") {
+    const parsed = Number(direct);
+    return Number.isFinite(parsed) ? parsed : "";
+  }
+
+  const fieldValue = getCardSightField(card, [
+    "numbered to",
+    "print run",
+    "serial numbered to",
+    "serial number"
+  ]);
+
+  if (!fieldValue) return "";
+
+  const match = String(fieldValue).match(/\/?\s*(\d{1,6})\b/);
+  return match ? Number(match[1]) : "";
+}
+
+function getCardSightField(card, keys) {
+  const wanted = keys.map(key => normalizeLookupText(key));
+  const fields = Array.isArray(card?.fields)
+    ? card.fields
+    : [];
+
+  for (const field of fields) {
+    const fieldKey = normalizeLookupText(
+      field?.key ||
+      field?.name ||
+      field?.label ||
+      ""
+    );
+
+    if (wanted.includes(fieldKey)) {
+      return (
+        field?.value ??
+        field?.text ??
+        field?.displayValue ??
+        ""
+      );
+    }
+  }
+
+  return "";
+}
+
 function populateAddFormFromCardSight(card) {
-  document.querySelector("#playerInput").value =
-    card.name || "";
-  document.querySelector("#yearInput").value =
-    card.year || "";
-  document.querySelector("#brandInput").value =
-    card.manufacturer || "";
-  document.querySelector("#setInput").value =
-    card.setName || card.releaseName || "";
-  document.querySelector("#cardNumberInput").value =
-    card.number || "";
+  const player = getCardSightPlayer(card);
+  const year = getCardSightYear(card);
+  const brand = getCardSightBrand(card);
+  const setName = getCardSightSet(card);
+  const cardNumber = getCardSightNumber(card);
+  const parallelName = getCardSightParallelName(card);
+  const printRun = getCardSightPrintRun(card);
+
+  document.querySelector("#playerInput").value = player;
+  document.querySelector("#yearInput").value = year;
+  document.querySelector("#brandInput").value = brand;
+  document.querySelector("#setInput").value = setName;
+  document.querySelector("#cardNumberInput").value = cardNumber;
 
   const selectedSport = elements.lookupSportInput.value;
 
@@ -1542,24 +1833,18 @@ function populateAddFormFromCardSight(card) {
       titleCase(selectedSport);
   }
 
-  if (card.parallel?.name) {
-    elements.parallelInput.value =
-      card.parallel.numberedTo
-        ? `${card.parallel.name} /${card.parallel.numberedTo}`
-        : card.parallel.name;
-  }
+  elements.parallelInput.value = parallelName;
 
-  if (card.parallel?.numberedTo) {
+  if (printRun) {
     elements.numberedInput.checked = true;
-    elements.printRunInput.value =
-      card.parallel.numberedTo;
+    elements.printRunInput.value = printRun;
   }
 
   const rookieText = [
-    card.name,
+    player,
+    setName,
     card.releaseName,
-    card.setName,
-    card.parallel?.name,
+    parallelName,
     JSON.stringify(card.fields || "")
   ].filter(Boolean).join(" ");
 
