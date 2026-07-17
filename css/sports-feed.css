@@ -1,0 +1,94 @@
+/* Sports feed panel */
+.sports-feed-panel { margin-top: 1rem; }
+.sports-feed-scores { display: grid; gap: .55rem; margin-top: .8rem; }
+.sports-feed-score {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: .65rem;
+  align-items: center;
+  padding: .65rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+.sports-feed-league {
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.sports-feed-matchup {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  font-size: .85rem;
+  min-width: 0;
+}
+.sports-feed-matchup strong { margin-left: .35rem; }
+.sports-feed-status {
+  font-size: .72rem;
+  font-weight: 800;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sports-feed-status.live { color: #26834f; }
+
+.sports-feed-news {
+  display: grid;
+  gap: .5rem;
+  margin-top: .9rem;
+}
+.sports-feed-headline {
+  display: grid;
+  gap: .2rem;
+  padding: .6rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  font-size: .82rem;
+}
+.sports-feed-headline:hover { border-color: var(--accent); }
+
+@media (max-width: 760px) {
+  .sports-feed-score { grid-template-columns: 44px minmax(0, 1fr); }
+  .sports-feed-status { grid-column: 2; }
+}
+
+/* Theme WOW-factor: photo loading shimmer */
+.card-photo-placeholder.is-loading {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.card-photo-placeholder.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent) 18%, transparent) 50%,
+    transparent 70%
+  );
+  animation: rv-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes rv-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* Theme WOW-factor: card detail flip */
+.detail-photo-frame {
+  perspective: 1000px;
+}
+.detail-photo {
+  transition: transform .18s ease-in;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+.detail-photo.is-flip-out {
+  transform: rotateY(90deg);
+}

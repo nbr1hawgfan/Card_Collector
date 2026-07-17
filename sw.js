@@ -1,12 +1,14 @@
-const CACHE_NAME = "rookie-vault-v23";
+const CACHE_NAME = "rookie-vault-v24";
 
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./css/app.css?v=23",
-  "./css/cardsight-diagnostics.css?v=23",
-  "./js/app.js?v=23",
-  "./js/cardsight-diagnostics.js?v=23",
+  "./css/app.css?v=24",
+  "./css/cardsight-diagnostics.css?v=24",
+  "./css/sports-feed.css?v=24",
+  "./js/app.js?v=24",
+  "./js/cardsight-diagnostics.js?v=24",
+  "./js/sports-feed.js?v=24",
   "./manifest.webmanifest",
   "./icons/icon.svg"
 ];

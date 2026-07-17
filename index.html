@@ -7,8 +7,9 @@
   <meta name="description" content="A private family sports card collection app.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/app.css?v=23">
-  <link rel="stylesheet" href="./css/cardsight-diagnostics.css?v=23">
+  <link rel="stylesheet" href="./css/app.css?v=24">
+  <link rel="stylesheet" href="./css/cardsight-diagnostics.css?v=24">
+  <link rel="stylesheet" href="./css/sports-feed.css?v=24">
   <title>Rookie Vault</title>
 </head>
 <body>
@@ -67,6 +68,33 @@
             <button id="homeSetsButton" class="button button-secondary" type="button">Set Tracker</button>
             <button id="homeShowButton" class="button button-secondary" type="button">Card Show Mode</button>
           </div>
+        </section>
+
+        <section class="panel sports-feed-panel" id="sportsFeedPanel">
+          <div class="diagnostic-heading">
+            <div>
+              <h4>Live scores &amp; news</h4>
+              <p class="muted">MLB, NFL, NBA, and NHL — filtered to your favorite teams.</p>
+            </div>
+            <div class="diagnostic-actions" style="margin-top:0">
+              <button id="sportsFeedSettingsButton" class="button button-secondary" type="button">Teams</button>
+              <button id="refreshSportsFeedButton" class="button button-secondary" type="button">Refresh</button>
+            </div>
+          </div>
+
+          <details id="sportsFeedSettings" class="cardsight-settings hidden">
+            <summary>Favorite teams</summary>
+            <label>Comma-separated team names (e.g. Yankees, Chiefs, Lakers)
+              <input id="sportsFeedTeamsInput" type="text" placeholder="Yankees, Chiefs">
+            </label>
+            <div class="diagnostic-actions">
+              <button id="saveSportsFeedTeamsButton" class="button" type="button">Save teams</button>
+            </div>
+          </details>
+
+          <div id="sportsFeedScores" class="sports-feed-scores"></div>
+          <div id="sportsFeedNews" class="sports-feed-news"></div>
+          <p id="sportsFeedMessage" class="muted small"></p>
         </section>
 
         <section class="stats-grid">
@@ -997,7 +1025,8 @@
     </article>
   </template>
 
-  <script type="module" src="./js/app.js?v=23"></script>
-  <script type="module" src="./js/cardsight-diagnostics.js?v=23"></script>
+  <script type="module" src="./js/app.js?v=24"></script>
+  <script type="module" src="./js/cardsight-diagnostics.js?v=24"></script>
+  <script type="module" src="./js/sports-feed.js?v=24"></script>
 </body>
 </html>

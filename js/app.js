@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createWorker } from "https://esm.sh/tesseract.js@7.0.0";
 import * as CardSightSdk from "https://esm.sh/cardsightai@3.6.0";
+import { initSportsFeed } from "./sports-feed.js";
 
 const PHOTO_BUCKET = "card-photos";
 const MAX_IMAGE_EDGE = 1800;
@@ -353,6 +354,7 @@ function bindEvents() {
   updateLastBackupDisplay();
   updateWishlistFields();
   updateCardSightStatus();
+  initSportsFeed();
   elements.signupButton.addEventListener("click", signUp);
   elements.logoutButton.addEventListener("click", signOut);
   elements.themeToggle.addEventListener("click", toggleTheme);
@@ -1509,6 +1511,56 @@ function addSelectedMissingCard() {
 }
 
 
+const cardSightSearchCache = new Map();
+const CARDSIGHT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes - cuts repeat free-tier calls
+
+async function cachedCardSightSearch(client, params){
+  const key = JSON.stringify(params);
+  const hit = cardSightSearchCache.get(key);
+  if (hit && Date.now() - hit.time < CARDSIGHT_CACHE_TTL_MS) {
+    return hit.response;
+  }
+  const response = await client.catalog.search(params);
+  cardSightSearchCache.set(key, { time: Date.now(), response });
+  return response;
+}
+
+// Narrows results using CardSight's dedicated year/brand filter params.
+// If that returns zero results (e.g. a brand spelling CardSight doesn't
+// recognize as a filter value), it automatically falls back to folding
+// year/brand into the free-text query, which is the older, proven-safe
+// behavior. This means a filter never makes results *worse* than before.
+async function searchCardSightNarrowed(client, { q, type = "card", take, segment, year, brand }) {
+  const narrowedParams = { q, type, take };
+  if (segment) narrowedParams.segment = segment;
+  if (year) narrowedParams.year = year;
+  if (brand) narrowedParams.brand = brand;
+
+  const narrowedResponse = await cachedCardSightSearch(client, narrowedParams);
+  const narrowedResults =
+    narrowedResponse?.data?.results ||
+    (Array.isArray(narrowedResponse?.data) ? narrowedResponse.data : []);
+
+  if (narrowedResults.length || (!year && !brand)) {
+    return { response: narrowedResponse, results: narrowedResults, narrowed: Boolean(year || brand) };
+  }
+
+  // Fallback: merge year/brand into the free-text query instead.
+  const fallbackParams = {
+    q: [year, brand, q].filter(Boolean).join(" "),
+    type,
+    take
+  };
+  if (segment) fallbackParams.segment = segment;
+
+  const fallbackResponse = await cachedCardSightSearch(client, fallbackParams);
+  const fallbackResults =
+    fallbackResponse?.data?.results ||
+    (Array.isArray(fallbackResponse?.data) ? fallbackResponse.data : []);
+
+  return { response: fallbackResponse, results: fallbackResults, narrowed: false };
+}
+
 function getCardSightApiKey(){return localStorage.getItem(CARDSIGHT_KEY_STORAGE)||""}
 function createCardSightClient(){const apiKey=getCardSightApiKey();if(!apiKey)throw new Error("Add a CardSight API key first.");return new CardSightSdk.CardSightAI({apiKey})}
 function updateCardSightStatus(){
@@ -1562,22 +1614,16 @@ async function searchCardSightForNewCard(event) {
   try {
     const client = createCardSightClient();
 
-    const params = {
-      q: query,
+    const { results: rawResults, narrowed } = await searchCardSightNarrowed(client, {
+      q: player,
       type: "card",
-      take: 30
-    };
+      take: 30,
+      segment: sport || undefined,
+      year,
+      brand
+    });
 
-    if (sport) {
-      params.segment = sport;
-    }
-
-    const response = await client.catalog.search(params);
-    let results =
-      response?.data?.results ||
-      (Array.isArray(response?.data) ? response.data : []);
-
-    results = rankLookupResults(results, {
+    let results = rankLookupResults(rawResults, {
       player,
       year,
       brand
@@ -1592,7 +1638,8 @@ async function searchCardSightForNewCard(event) {
 
     renderLookupResults(results);
     elements.lookupSearchMessage.textContent =
-      `${results.length} possible card${results.length === 1 ? "" : "s"} found. Choose the exact match.`;
+      `${results.length} possible card${results.length === 1 ? "" : "s"} found` +
+      (narrowed ? " (narrowed by year/brand)." : ". Choose the exact match.");
   } catch (error) {
     console.error("Search-first CardSight lookup failed:", error);
     elements.lookupSearchMessage.textContent =
@@ -2171,11 +2218,13 @@ async function searchCardSightCatalog(query){
   elements.searchCardSightButton.disabled=true;elements.searchCardSightButton.textContent="Searching...";elements.cardSightResults.replaceChildren();
   try{
     const client=createCardSightClient(),sport=String(elements.scanSportSuggestion.value||"").toLowerCase();
-    const params={q,type:"card",take:12};if(["baseball","football","basketball","hockey"].includes(sport))params.segment=sport;
-    const response=await client.catalog.search(params);
-    const results=response?.data?.results||(Array.isArray(response?.data)?response.data:[]);
+    const year=String(elements.scanYearSuggestion?.value||"").trim();
+    const brand=String(elements.scanBrandSuggestion?.value||"").trim();
+    const segment=["baseball","football","basketball","hockey"].includes(sport)?sport:undefined;
+    const {results,narrowed}=await searchCardSightNarrowed(client,{q,type:"card",take:12,segment,year,brand});
     if(!results.length){elements.cardSightMessage.textContent="No catalog matches. Try fewer words.";return}
-    renderCardSightCandidates(results,"Catalog result");elements.cardSightMessage.textContent=`${results.length} possible match${results.length===1?"":"es"} found.`;
+    renderCardSightCandidates(results,"Catalog result");
+    elements.cardSightMessage.textContent=`${results.length} possible match${results.length===1?"":"es"} found${narrowed?" (narrowed by year/brand)":""}.`;
   }catch(error){console.error(error);elements.cardSightMessage.textContent=error?.message||"Catalog search failed."}
   finally{elements.searchCardSightButton.disabled=false;elements.searchCardSightButton.textContent="Search catalog"}
 }
@@ -3112,6 +3161,12 @@ function renderCards() {
       photo.alt = `Front of ${card.player_name} card`;
       photo.classList.remove("hidden");
       placeholder.classList.add("hidden");
+      placeholder.classList.remove("is-loading");
+    } else if (card.front_photo_path && !card.photo_load_errors?.includes("front")) {
+      // Photo exists but the signed URL is still resolving in the background.
+      placeholder.classList.add("is-loading");
+    } else {
+      placeholder.classList.remove("is-loading");
     }
 
     fragment.querySelector(".card-meta").textContent =
@@ -3229,10 +3284,31 @@ function closeCardDialog() {
 }
 
 function setDetailSide(side) {
-  detailSide = side;
+  const sideChanged = detailSide !== side;
+  const photoCurrentlyVisible = !elements.detailPhoto.classList.contains("hidden");
 
   elements.showFrontButton.classList.toggle("active", side === "front");
   elements.showBackButton.classList.toggle("active", side === "back");
+
+  if (sideChanged && photoCurrentlyVisible) {
+    flipDetailPhoto(side);
+  } else {
+    applyDetailPhoto(side);
+  }
+}
+
+function flipDetailPhoto(side) {
+  const photo = elements.detailPhoto;
+  photo.classList.add("is-flip-out");
+
+  window.setTimeout(() => {
+    applyDetailPhoto(side);
+    photo.classList.remove("is-flip-out");
+  }, 180);
+}
+
+function applyDetailPhoto(side) {
+  detailSide = side;
 
   const url =
     side === "front"
