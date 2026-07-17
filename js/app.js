@@ -19,6 +19,16 @@ const elements = {
   collectionView: document.querySelector("#collectionView"),
   tradeView: document.querySelector("#tradeView"),
   scanView: document.querySelector("#scanView"),
+  lookupCardForm: document.querySelector("#lookupCardForm"),
+  lookupPlayerInput: document.querySelector("#lookupPlayerInput"),
+  lookupYearInput: document.querySelector("#lookupYearInput"),
+  lookupSportInput: document.querySelector("#lookupSportInput"),
+  lookupBrandInput: document.querySelector("#lookupBrandInput"),
+  lookupSearchButton: document.querySelector("#lookupSearchButton"),
+  lookupSearchMessage: document.querySelector("#lookupSearchMessage"),
+  lookupResults: document.querySelector("#lookupResults"),
+  lookupResultsEmpty: document.querySelector("#lookupResultsEmpty"),
+  lookupKeyStatus: document.querySelector("#lookupKeyStatus"),
   scanFrontInput: document.querySelector("#scanFrontInput"),
   scanBackInput: document.querySelector("#scanBackInput"),
   scanFrontPreview: document.querySelector("#scanFrontPreview"),
@@ -303,6 +313,7 @@ function bindEvents() {
   elements.clearTradeButton.addEventListener("click", clearTrade);
   elements.tradeSearchInput.addEventListener("input", renderTradeBuilder);
   elements.otherTradeForm.addEventListener("submit", addOtherTradeItem);
+  elements.lookupCardForm.addEventListener("submit", searchCardSightForNewCard);
   elements.scanFrontInput.addEventListener("change", () => previewScanPhoto(elements.scanFrontInput, elements.scanFrontPreview));
   elements.scanBackInput.addEventListener("change", () => previewScanPhoto(elements.scanBackInput, elements.scanBackPreview));
   elements.analyzeCardButton.addEventListener("click", analyzeScannedCard);
@@ -1253,10 +1264,346 @@ function addSelectedMissingCard() {
 
 function getCardSightApiKey(){return localStorage.getItem(CARDSIGHT_KEY_STORAGE)||""}
 function createCardSightClient(){const apiKey=getCardSightApiKey();if(!apiKey)throw new Error("Add a CardSight API key first.");return new CardSightSdk.CardSightAI({apiKey})}
-function updateCardSightStatus(){const key=getCardSightApiKey();elements.cardSightStatusBadge.textContent=key?"API key saved":"API key not set";elements.cardSightApiKeyInput.value=key}
+function updateCardSightStatus(){
+  const key = getCardSightApiKey();
+  elements.cardSightStatusBadge.textContent = key ? "API key saved" : "API key not set";
+  elements.cardSightApiKeyInput.value = key;
+
+  if (elements.lookupKeyStatus) {
+    elements.lookupKeyStatus.textContent = key
+      ? "CardSight ready"
+      : "CardSight key required";
+  }
+}
 function saveCardSightKey(){const key=elements.cardSightApiKeyInput.value.trim();if(!key){elements.cardSightMessage.textContent="Paste an API key first.";return}localStorage.setItem(CARDSIGHT_KEY_STORAGE,key);updateCardSightStatus();elements.cardSightSettings.open=false;elements.cardSightMessage.textContent="CardSight key saved on this device."}
 function clearCardSightKey(){localStorage.removeItem(CARDSIGHT_KEY_STORAGE);elements.cardSightApiKeyInput.value="";elements.cardSightResults.replaceChildren();selectedCardSightCard=null;updateCardSightStatus();elements.cardSightMessage.textContent="CardSight key removed."}
 function requireCardSightKey(){if(getCardSightApiKey())return true;elements.cardSightSettings.open=true;elements.cardSightMessage.textContent="Add a CardSight API key first.";elements.cardSightApiKeyInput.focus();return false}
+
+
+async function searchCardSightForNewCard(event) {
+  event.preventDefault();
+
+  if (!requireCardSightKey()) {
+    elements.lookupSearchMessage.textContent =
+      "Open CardSight API settings below and save the API key first.";
+    return;
+  }
+
+  const player = elements.lookupPlayerInput.value.trim();
+  const year = elements.lookupYearInput.value.trim();
+  const sport = elements.lookupSportInput.value;
+  const brand = elements.lookupBrandInput.value.trim();
+
+  if (!player) {
+    elements.lookupSearchMessage.textContent =
+      "Enter a player name before searching.";
+    elements.lookupPlayerInput.focus();
+    return;
+  }
+
+  const query = [year, brand, player]
+    .filter(Boolean)
+    .join(" ");
+
+  elements.lookupSearchButton.disabled = true;
+  elements.lookupSearchButton.textContent = "Searching...";
+  elements.lookupSearchMessage.textContent =
+    `Searching CardSight for “${query}”...`;
+  elements.lookupResults.replaceChildren();
+  elements.lookupResultsEmpty.classList.add("hidden");
+
+  try {
+    const client = createCardSightClient();
+
+    const params = {
+      q: query,
+      type: "card",
+      take: 30
+    };
+
+    if (sport) {
+      params.segment = sport;
+    }
+
+    const response = await client.catalog.search(params);
+    let results =
+      response?.data?.results ||
+      (Array.isArray(response?.data) ? response.data : []);
+
+    results = rankLookupResults(results, {
+      player,
+      year,
+      brand
+    });
+
+    if (!results.length) {
+      elements.lookupResultsEmpty.classList.remove("hidden");
+      elements.lookupSearchMessage.textContent =
+        "No results were returned. Try only the player name, remove the year, or use a shorter brand/set name.";
+      return;
+    }
+
+    renderLookupResults(results);
+    elements.lookupSearchMessage.textContent =
+      `${results.length} possible card${results.length === 1 ? "" : "s"} found. Choose the exact match.`;
+  } catch (error) {
+    console.error("Search-first CardSight lookup failed:", error);
+    elements.lookupSearchMessage.textContent =
+      explainLookupError(error);
+  } finally {
+    elements.lookupSearchButton.disabled = false;
+    elements.lookupSearchButton.textContent = "Search CardSight";
+  }
+}
+
+function rankLookupResults(results, search) {
+  const playerText = normalizeLookupText(search.player);
+  const brandText = normalizeLookupText(search.brand);
+  const yearText = String(search.year || "");
+
+  return [...results]
+    .map(item => {
+      const searchable = normalizeLookupText([
+        item.name,
+        item.year,
+        item.manufacturer,
+        item.releaseName,
+        item.setName,
+        item.number,
+        item.parallel?.name
+      ].filter(Boolean).join(" "));
+
+      let score = 0;
+
+      if (playerText && searchable.includes(playerText)) score += 30;
+      if (yearText && String(item.year || "") === yearText) score += 20;
+      if (brandText && searchable.includes(brandText)) score += 15;
+      if (item.id) score += 8;
+      if (item.number) score += 4;
+      if (item.manufacturer) score += 2;
+
+      return { item, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .map(entry => entry.item);
+}
+
+function normalizeLookupText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function renderLookupResults(results) {
+  elements.lookupResults.replaceChildren();
+
+  for (const item of results) {
+    const article = document.createElement("article");
+    article.className = "lookup-result-card";
+
+    const main = document.createElement("div");
+    main.className = "lookup-result-main";
+
+    const title = document.createElement("strong");
+    title.textContent = CardSightSdk.formatCardDisplay
+      ? CardSightSdk.formatCardDisplay(item)
+      : [
+          item.year,
+          item.manufacturer,
+          item.name
+        ].filter(Boolean).join(" ");
+
+    const details = document.createElement("span");
+    details.textContent = [
+      item.releaseName,
+      item.setName,
+      item.number ? `#${item.number}` : null,
+      item.parallel?.name,
+      item.parallel?.numberedTo
+        ? `numbered /${item.parallel.numberedTo}`
+        : null
+    ].filter(Boolean).join(" • ") || "Open the match to review full details.";
+
+    const badges = document.createElement("div");
+    badges.className = "lookup-result-badges";
+
+    if (item.id) {
+      badges.append(buildLookupBadge("Exact catalog card"));
+    }
+
+    if (item.year) {
+      badges.append(buildLookupBadge(String(item.year)));
+    }
+
+    if (item.manufacturer) {
+      badges.append(buildLookupBadge(item.manufacturer));
+    }
+
+    main.append(title, details, badges);
+
+    const selectButton = document.createElement("button");
+    selectButton.type = "button";
+    selectButton.className = "button";
+    selectButton.textContent = "Select card";
+    selectButton.addEventListener("click", () =>
+      selectLookupCardForAdd(item)
+    );
+
+    article.append(main, selectButton);
+    elements.lookupResults.append(article);
+  }
+}
+
+function buildLookupBadge(text) {
+  const badge = document.createElement("span");
+  badge.className = "lookup-result-badge";
+  badge.textContent = text;
+  return badge;
+}
+
+async function selectLookupCardForAdd(item) {
+  elements.lookupSearchMessage.textContent =
+    "Loading full card details and recent pricing...";
+
+  try {
+    const client = createCardSightClient();
+    let card = item;
+
+    if (item.id) {
+      try {
+        const response = await client.catalog.cards.get(item.id);
+        if (response?.data) {
+          card = response.data;
+        }
+      } catch (error) {
+        console.warn(
+          "Full card record was unavailable; using the search result.",
+          error
+        );
+      }
+    }
+
+    resetCardForm();
+    populateAddFormFromCardSight(card);
+
+    if (card.id) {
+      const estimate = await getCardSightPricingEstimate(card.id);
+
+      if (estimate !== null) {
+        document.querySelector("#valueInput").value =
+          estimate.toFixed(2);
+      }
+    }
+
+    navigateTo("add");
+
+    const player =
+      card.name ||
+      elements.lookupPlayerInput.value.trim() ||
+      "selected card";
+
+    setCardMessage(
+      `${player} was populated from CardSight. Review the details, then take or choose the front and back photos before saving.`
+    );
+
+    window.setTimeout(() => {
+      document
+        .querySelector(".photo-fieldset")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+    }, 350);
+  } catch (error) {
+    console.error("Could not select CardSight result:", error);
+    elements.lookupSearchMessage.textContent =
+      explainLookupError(error);
+  }
+}
+
+function populateAddFormFromCardSight(card) {
+  document.querySelector("#playerInput").value =
+    card.name || "";
+  document.querySelector("#yearInput").value =
+    card.year || "";
+  document.querySelector("#brandInput").value =
+    card.manufacturer || "";
+  document.querySelector("#setInput").value =
+    card.setName || card.releaseName || "";
+  document.querySelector("#cardNumberInput").value =
+    card.number || "";
+
+  const selectedSport = elements.lookupSportInput.value;
+
+  if (selectedSport) {
+    document.querySelector("#sportInput").value =
+      titleCase(selectedSport);
+  }
+
+  if (card.parallel?.name) {
+    elements.parallelInput.value =
+      card.parallel.numberedTo
+        ? `${card.parallel.name} /${card.parallel.numberedTo}`
+        : card.parallel.name;
+  }
+
+  if (card.parallel?.numberedTo) {
+    elements.numberedInput.checked = true;
+    elements.printRunInput.value =
+      card.parallel.numberedTo;
+  }
+
+  const rookieText = [
+    card.name,
+    card.releaseName,
+    card.setName,
+    card.parallel?.name,
+    JSON.stringify(card.fields || "")
+  ].filter(Boolean).join(" ");
+
+  elements.rookieInput.checked =
+    /\b(RC|ROOKIE)\b/i.test(rookieText);
+
+  updateCollectorFieldVisibility();
+}
+
+async function getCardSightPricingEstimate(cardId) {
+  try {
+    const response = await createCardSightClient().pricing.get(
+      cardId,
+      {
+        period: "1y",
+        listing_type: "both"
+      }
+    );
+
+    return estimateCardSightValue(response?.data);
+  } catch (error) {
+    console.warn("CardSight pricing lookup was unavailable.", error);
+    return null;
+  }
+}
+
+function explainLookupError(error) {
+  const status =
+    error?.status ||
+    error?.response?.status ||
+    null;
+
+  if (status === 401 || status === 403) {
+    return "CardSight rejected the saved API key. Run diagnostics or save a current key.";
+  }
+
+  if (status === 429) {
+    return "The CardSight usage or rate limit has been reached.";
+  }
+
+  return error?.message
+    ? `CardSight search failed: ${error.message}`
+    : "CardSight search failed. Try a shorter search.";
+}
 
 async function identifyWithCardSight(){
   if(!requireCardSightKey())return;

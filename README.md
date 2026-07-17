@@ -1,4 +1,4 @@
-# Rookie Vault CardSight Diagnostics
+# Rookie Vault Search-First Add Card
 
 No Supabase migration is required.
 
@@ -10,17 +10,34 @@ Replace:
 - `js/cardsight-diagnostics.js`
 - `sw.js`
 
-Keep `js/config.js`.
+Keep:
+- `js/config.js`
 
-## Tests
-- SDK/client creation
-- Public API health
-- API-key authentication
-- Account/subscription usage
-- Aaron Judge autocomplete
-- Aaron Judge catalog search
-- Optional current-photo card detection
+## New recommended workflow
 
-The report exposes the real response/error while redacting keys and authorization values.
+1. Open **Lookup**.
+2. Enter player name.
+3. Optionally enter year, sport, and brand/set.
+4. Search CardSight.
+5. Select the exact catalog result.
+6. Rookie Vault fills the Add Card form.
+7. Add front and back photos.
+8. Review and save.
 
-Suggested commit: `Add CardSight connection and catalog diagnostics`
+## What is populated
+
+- Player
+- Year
+- Manufacturer/brand
+- Set or release
+- Card number
+- Parallel
+- Serial print run when supplied
+- Possible rookie status
+- Recent-sales value when CardSight pricing is available
+
+OCR and photo identification remain under **Optional photo and OCR tools**, but are no longer the primary workflow.
+
+Suggested commit:
+
+`Add search first CardSight card entry workflow`

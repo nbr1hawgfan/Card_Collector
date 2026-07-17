@@ -7,8 +7,8 @@
   <meta name="description" content="A private family sports card collection app.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/app.css?v=18">
-  <link rel="stylesheet" href="./css/cardsight-diagnostics.css?v=18">
+  <link rel="stylesheet" href="./css/app.css?v=19">
+  <link rel="stylesheet" href="./css/cardsight-diagnostics.css?v=19">
   <title>Rookie Vault</title>
 </head>
 <body>
@@ -519,12 +519,65 @@
         <section class="panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow accent-text">Vault Vision</p>
-              <h2>Scan Assistant</h2>
-              <p class="muted">Photograph the front and back, then review Rookie Vault's suggestions.</p>
+              <p class="eyebrow accent-text">Fast card entry</p>
+              <h2>Find a Card</h2>
+              <p class="muted">Search the CardSight catalog first, select the exact card, then add front and back photos in the normal Add Card form.</p>
             </div>
             <button id="resetScanButton" class="button button-secondary" type="button">Start over</button>
           </div>
+
+
+          <section class="lookup-first-panel">
+            <div class="lookup-step-heading">
+              <div>
+                <span class="lookup-step-number">1</span>
+                <div>
+                  <p class="eyebrow accent-text">Search the catalog</p>
+                  <h3>Who is on the card?</h3>
+                </div>
+              </div>
+              <span id="lookupKeyStatus" class="research-date">CardSight key required</span>
+            </div>
+
+            <form id="lookupCardForm" class="lookup-card-form">
+              <label>Player name
+                <input id="lookupPlayerInput" required maxlength="120" autocomplete="off" placeholder="Patrick Mahomes">
+              </label>
+
+              <label>Card year
+                <input id="lookupYearInput" type="number" min="1900" max="2200" inputmode="numeric" placeholder="2023">
+              </label>
+
+              <label>Sport
+                <select id="lookupSportInput">
+                  <option value="">Any supported sport</option>
+                  <option value="baseball">Baseball</option>
+                  <option value="football">Football</option>
+                  <option value="basketball">Basketball</option>
+                  <option value="hockey">Hockey</option>
+                </select>
+              </label>
+
+              <label>Brand or set <span class="muted">(optional)</span>
+                <input id="lookupBrandInput" maxlength="120" placeholder="Prizm, Topps Chrome...">
+              </label>
+
+              <button id="lookupSearchButton" class="button lookup-search-button" type="submit">
+                Search CardSight
+              </button>
+            </form>
+
+            <div class="lookup-search-summary">
+              <p id="lookupSearchMessage" class="muted">Enter at least a player name. Adding a year usually gives much better results.</p>
+            </div>
+
+            <div id="lookupResults" class="lookup-results"></div>
+            <p id="lookupResultsEmpty" class="empty-state hidden">No matching cards were returned.</p>
+          </section>
+
+          <details class="optional-scan-tools">
+            <summary>Optional photo and OCR tools</summary>
+            <p class="muted">These tools remain available for difficult cards, but catalog search is now the recommended starting point.</p>
 
           <div class="scan-layout">
             <section class="scan-box">
@@ -646,6 +699,8 @@
             <div id="cardSightResults" class="cardsight-results"></div>
           </section>
 
+          </details>
+
           <p id="scanMessage" class="message" aria-live="polite"></p>
         </section>
       </section>
@@ -744,7 +799,7 @@
         </button>
         <button class="nav-button" type="button" data-view="scan">
           <span class="nav-icon" aria-hidden="true">⌾</span>
-          <span>Scan</span>
+          <span>Lookup</span>
         </button>
         <button class="nav-button" type="button" data-view="trade">
           <span class="nav-icon" aria-hidden="true">⇄</span>
@@ -942,7 +997,7 @@
     </article>
   </template>
 
-  <script type="module" src="./js/app.js?v=18"></script>
-  <script type="module" src="./js/cardsight-diagnostics.js?v=18"></script>
+  <script type="module" src="./js/app.js?v=19"></script>
+  <script type="module" src="./js/cardsight-diagnostics.js?v=19"></script>
 </body>
 </html>

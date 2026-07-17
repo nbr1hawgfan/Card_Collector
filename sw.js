@@ -1,11 +1,11 @@
-const CACHE_NAME = "rookie-vault-v18";
+const CACHE_NAME = "rookie-vault-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./css/app.css?v=18",
-  "./css/cardsight-diagnostics.css?v=18",
-  "./js/app.js?v=18",
-  "./js/cardsight-diagnostics.js?v=18",
+  "./css/app.css?v=19",
+  "./css/cardsight-diagnostics.css?v=19",
+  "./js/app.js?v=19",
+  "./js/cardsight-diagnostics.js?v=19",
   "./manifest.webmanifest",
   "./icons/icon.svg"
 ];
