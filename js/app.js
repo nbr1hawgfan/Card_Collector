@@ -531,50 +531,91 @@ async function loadCards() {
 
   if (error) {
     console.error("Card loading failed:", error);
-    setCardMessage("Could not load the collection.");
+    setCardMessage(
+      `Could not load the collection: ${error.message || "unknown database error"}`
+    );
     return;
   }
 
-  cards = data ?? [];
-  await attachSignedPhotoUrls(cards);
+  cards = (data ?? []).map(card => ({
+    ...card,
+    front_photo_url: null,
+    back_photo_url: null,
+    photo_load_errors: []
+  }));
+
+  // Render database data immediately. Photo signing must never delay or hide
+  // the collection.
   renderCards();
-  if (activeAppView === "trade") renderTradeBuilder();
+
+  if (activeAppView === "trade") {
+    renderTradeBuilder();
+  }
+
+  // Load private Storage URLs in the background.
+  void attachSignedPhotoUrls(cards);
 }
 
 async function attachSignedPhotoUrls(cardRows) {
-  await Promise.all(cardRows.map(async card => {
-    card.front_photo_url = null;
-    card.back_photo_url = null;
-    card.photo_load_errors = [];
+  await Promise.allSettled(
+    cardRows.map(async card => {
+      card.photo_load_errors = [];
 
-    if (card.front_photo_path) {
-      card.front_photo_url =
-        await createSignedPhotoUrl(card.front_photo_path);
+      if (card.front_photo_path) {
+        card.front_photo_url =
+          await createSignedPhotoUrlWithTimeout(
+            card.front_photo_path,
+            8000
+          );
 
-      if (!card.front_photo_url) {
-        card.photo_load_errors.push("front");
+        if (!card.front_photo_url) {
+          card.photo_load_errors.push("front");
+        }
       }
-    }
 
-    if (card.back_photo_path) {
-      card.back_photo_url =
-        await createSignedPhotoUrl(card.back_photo_path);
+      if (card.back_photo_path) {
+        card.back_photo_url =
+          await createSignedPhotoUrlWithTimeout(
+            card.back_photo_path,
+            8000
+          );
 
-      if (!card.back_photo_url) {
-        card.photo_load_errors.push("back");
+        if (!card.back_photo_url) {
+          card.photo_load_errors.push("back");
+        }
       }
-    }
 
-    if (card.photo_load_errors.length) {
-      console.warn("Card photo URL failure:", {
-        cardId: card.id,
-        player: card.player_name,
-        failedSides: card.photo_load_errors,
-        frontPath: card.front_photo_path,
-        backPath: card.back_photo_path
-      });
-    }
-  }));
+      if (card.photo_load_errors.length) {
+        console.warn("Card photo URL failure:", {
+          cardId: card.id,
+          player: card.player_name,
+          failedSides: card.photo_load_errors,
+          frontPath: card.front_photo_path,
+          backPath: card.back_photo_path
+        });
+      }
+
+      // Refresh cards as each card's photos finish. A slow or bad image can no
+      // longer block every card from appearing.
+      renderCards();
+
+      if (activeAppView === "trade") {
+        renderTradeBuilder();
+      }
+    })
+  );
+}
+
+async function createSignedPhotoUrlWithTimeout(path, milliseconds) {
+  return Promise.race([
+    createSignedPhotoUrl(path),
+    new Promise(resolve =>
+      window.setTimeout(() => {
+        console.warn(`Photo URL timed out for ${path}`);
+        resolve(null);
+      }, milliseconds)
+    )
+  ]);
 }
 
 async function createSignedPhotoUrl(path) {
@@ -878,28 +919,9 @@ async function verifyStoredPhoto(path, side = "photo") {
 
       const signedUrl = await createSignedPhotoUrlStrict(path);
 
-      // Confirm the exact URL the app will use can actually be opened.
-      const response = await fetch(signedUrl, {
-        method: "GET",
-        cache: "no-store"
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `signed photo URL returned HTTP ${response.status}`
-        );
-      }
-
-      const readableBlob = await response.blob();
-
-      if (!readableBlob?.size) {
-        throw new Error("signed photo URL returned an empty image");
-      }
-
       return {
         signedUrl,
-        downloadBytes: downloadBlob.size,
-        readableBytes: readableBlob.size
+        downloadBytes: downloadBlob.size
       };
     } catch (error) {
       lastError = error;

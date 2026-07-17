@@ -1,6 +1,6 @@
-# Rookie Vault Photo Verification Fix
+# Rookie Vault Supabase Cache and Sync Fix
 
-No database migration is required.
+No Supabase migration is required.
 
 Replace:
 - `index.html`
@@ -13,24 +13,45 @@ Replace:
 Keep:
 - `js/config.js`
 
-## What changed
+## Root cause fixed
 
-- Verifies that each selected photo compresses to a non-empty JPEG
-- Uploads each photo to the `card-photos` Supabase Storage bucket
-- Downloads the newly uploaded object to prove it exists and is readable
-- Creates a signed URL and opens it before the card is saved
-- Retries photo verification three times for slower mobile connections
-- Supports both `signedUrl` and `signedURL` response property names
-- Verifies the photo paths were actually returned with the saved database row
-- Reports whether zero, one, or two photos are readable after collection reload
-- Gives a specific Storage policy error instead of reporting a false successful save
-- PWA cache version v22
+The previous service worker intercepted every GET request, including:
 
-## Existing test card
+- Supabase database requests
+- Supabase authentication traffic
+- Supabase Storage signed photo URLs
+- CardSight API requests
 
-Edit the existing test card, select its front and back photos again, and save.
-The new code will either verify both photos or show the exact failing Storage step.
+Those responses could be cached and reused across refreshes. Signed photo URLs could also be cached after they expired.
+
+## Changes
+
+- Service worker now caches only same-origin Rookie Vault app files
+- Supabase and CardSight requests always go directly to the network
+- Signed photo URLs are never placed in the PWA cache
+- Card database rows render immediately
+- Photo URL creation runs separately in the background
+- A slow or broken photo can no longer delay the entire collection
+- Each photo-signing request has an eight-second timeout
+- Removed the extra browser fetch that could incorrectly fail because of CORS
+- Cache version bumped to v23
+
+## Important device cleanup
+
+After deploying:
+
+1. Open the normal website URL in the browser.
+2. Refresh once.
+3. Close every Rookie Vault tab/window.
+4. Reopen the website.
+5. For installed home-screen PWAs, remove the old icon and install it again once.
+
+The v23 service worker deletes earlier Rookie Vault caches during activation.
+
+## Existing card photos
+
+Edit the test card and upload the front/back photos one more time after v23 is active. They will no longer be stored behind an expired cached signed URL.
 
 Suggested commit:
 
-`Verify Supabase photo uploads before saving cards`
+`Stop caching Supabase data and signed photo URLs`
