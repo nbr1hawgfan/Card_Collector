@@ -1,24 +1,69 @@
 # Rookie Vault - Small Wins Update (v24)
 
-Three small, additive changes. No Supabase migration needed.
+Four changes, all additive except one: the Trade tab is replaced by a new
+**Vault Ledger** inventory view. No Supabase migration needed.
 
 **Everything in this bundle is a ready-to-extract, drop-in replacement.**
-`index.html` already has the new panel, stylesheet, and script tags wired
-in — you don't need to hand-edit anything. Just replace your existing files
-with these.
+`index.html` already has the ledger view, sports feed panel, and version
+tags wired in — you don't need to hand-edit anything. Just replace your
+existing files with these.
 
 ## Files in this bundle (replace all of these)
 
-- `index.html` (sports feed panel added, version tags bumped to v24)
-- `js/app.js` (CardSight caching + real year/brand filters + card-flip animation + photo shimmer hook)
+- `index.html` (Trade tab replaced with Vault Ledger, sports feed panel added, version tags bumped to v24)
+- `js/app.js` (Vault Ledger, CardSight caching + real year/brand filters, card-flip animation, photo shimmer hook)
 - `js/cardsight-diagnostics.js` (unchanged, included for completeness)
 - `js/sports-feed.js` (new)
 - `css/app.css` (unchanged, included for completeness)
 - `css/cardsight-diagnostics.css` (unchanged, included for completeness)
-- `css/sports-feed.css` (new)
+- `css/sports-feed.css` (new — also holds the Vault Ledger and flip/shimmer styles)
 - `sw.js` (bumped to v24, adds the two new files to the app shell)
 
 Keep as-is (not in this bundle): `js/config.js`
+
+## 0. Vault Ledger replaces Trade
+
+The old two-sided trade calculator is gone. In its place, on the same nav
+slot: an inventory view built around what you actually said you wanted —
+value, status, and eBay research in one place, with your "loves an
+inventory" instinct pointed at the collection instead of the warehouse.
+
+**What's real vs. what's not**: I did not fabricate any live market-trend
+data — there's no feed telling you "comps are up 9% today" because that
+data doesn't exist anywhere in your stack yet. Everything shown is computed
+from data you already have:
+
+- **Total value** — sum of `estimated_value × quantity` across active cards.
+- **This week** — a genuine week-over-week % change. The app now takes a
+  daily snapshot of the total portfolio value in `localStorage` each time
+  the ledger renders, and compares today's total to the snapshot closest to
+  7 days ago. Shows "New" until there's at least a week of history — it
+  will never show a made-up number.
+- **Sell candidates** — real count of cards marked "For trade" or
+  "Duplicate" (existing status field, just surfaced here).
+- **Needs price check** — real count of cards with no `price_checked_at`,
+  or one older than 30 days.
+- **Per-row up/down %** — this one's opt-in and grows over time: every time
+  you save pricing research on a card (the existing "Save pricing research"
+  button in the card detail dialog), it now also records that value with a
+  timestamp in `localStorage`. Once a card has two or more saved checks, the
+  ledger shows the real % change between the last two. Cards with fewer
+  than two checks show "—" instead of guessing.
+- **Insights strip** — plain-language version of the same counts above
+  (e.g. "3 duplicates ready to list on eBay"), not a separate data source.
+
+**If you want true market-trend data later** (real eBay sold-price history
+tracked over time, not just what you manually save), that's a bigger,
+legitimate feature — it'd mean a small price-history table in Supabase and
+either a scheduled job or CardSight's pricing endpoint called on a
+schedule. Worth a separate conversation whenever you're ready; didn't want
+to fake it in the meantime.
+
+Table view and card-grid view are both there (toggle top-right) — table's
+tighter for you on desktop, cards read better on Brenton's phone. Tapping
+any row opens the existing card detail dialog, same as the collection view.
+The $ icon opens an eBay sold-listings search for that exact card (reusing
+your existing search-string builder); the ↗ icon opens the card detail.
 
 ## 1. CardSight: real year/brand filters + fewer wasted calls
 
@@ -89,14 +134,18 @@ worker takes over cleanly.
 
 Test in this order so a problem is easy to isolate:
 1. Load the app normally, confirm existing collection/photos still render.
-2. Run a CardSight lookup search with a year and brand filled in — check the
+2. Open the Ledger tab (bottom nav, replaces where Trade was). Confirm the
+   metric strip shows real numbers and doesn't error in the console.
+3. Save pricing research on a card twice (a few minutes apart is fine) and
+   confirm the ledger row shows a real up/down % on the second save.
+4. Run a CardSight lookup search with a year and brand filled in — check the
    result message for "(narrowed by year/brand)" to confirm the real params
    worked.
-3. Open a card's detail view and tap Front/Back to see the flip.
-4. Check the new "Live scores & news" panel on Home loads without errors
-   (open browser dev tools console if it looks empty).
+5. Open a card's detail view and tap Front/Back to see the flip.
+6. Check the "Live scores & news" panel on Home loads without errors (open
+   browser dev tools console if it looks empty).
 
 ## Suggested commit
 
-`Add CardSight year/brand filters with fallback, card flip animation, live scores/news feed`
+`Replace Trade tab with Vault Ledger, add CardSight year/brand filters with fallback, card flip animation, live scores/news feed`
 

@@ -57,6 +57,102 @@
   .sports-feed-status { grid-column: 2; }
 }
 
+/* Vault Ledger */
+.ledger-view-toggle { display: flex; gap: .5rem; }
+.ledger-view-toggle .button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.ledger-insights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: .8rem 0;
+}
+.ledger-insight-chip {
+  padding: .45rem .75rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .78rem;
+  font-weight: 700;
+}
+.ledger-table { display: grid; gap: .5rem; margin-top: .8rem; }
+.ledger-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 90px 64px auto;
+  gap: .75rem;
+  align-items: center;
+  padding: .6rem .75rem;
+  border-left: 3px solid var(--border);
+  border-radius: 0 11px 11px 0;
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.ledger-row.up { border-left-color: #26834f; }
+.ledger-row.down { border-left-color: var(--danger); }
+.ledger-row.flat { border-left-color: var(--muted); }
+.ledger-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.ledger-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ledger-row-info { min-width: 0; display: grid; gap: .15rem; }
+.ledger-row-info strong { font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-row-info span { font-size: .75rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ledger-row-value { font-weight: 800; font-size: .85rem; text-align: right; }
+.ledger-row-change { font-size: .75rem; font-weight: 700; text-align: right; color: var(--muted); }
+.ledger-row.up .ledger-row-change { color: #26834f; }
+.ledger-row.down .ledger-row-change { color: var(--danger); }
+.ledger-row-actions { display: flex; gap: .35rem; justify-content: flex-end; }
+.ledger-icon-button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+}
+.ledger-icon-button:hover { border-color: var(--accent); }
+
+.ledger-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: .8rem;
+  margin-top: .8rem;
+}
+.ledger-grid-card {
+  display: grid;
+  gap: .3rem;
+  padding: .75rem;
+  border-radius: 12px;
+  border-left: 3px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+.ledger-grid-card.up { border-left-color: #26834f; }
+.ledger-grid-card.down { border-left-color: var(--danger); }
+.ledger-grid-card.flat { border-left-color: var(--muted); }
+.ledger-grid-card .ledger-thumb { width: 100%; height: 120px; border-radius: 10px; }
+.ledger-grid-card strong { font-size: .85rem; }
+.ledger-grid-card > span:nth-of-type(1) { font-size: .75rem; color: var(--muted); }
+
+@media (max-width: 760px) {
+  .ledger-row {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-areas: "thumb info actions" "thumb value change";
+  }
+}
+
 /* Theme WOW-factor: photo loading shimmer */
 .card-photo-placeholder.is-loading {
   position: relative;

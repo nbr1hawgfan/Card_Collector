@@ -122,23 +122,20 @@ const elements = {
   exportSummaryButton: document.querySelector("#exportSummaryButton"),
   lastBackupText: document.querySelector("#lastBackupText"),
   backupMessage: document.querySelector("#backupMessage"),
-  clearTradeButton: document.querySelector("#clearTradeButton"),
-  myTradeTotal: document.querySelector("#myTradeTotal"),
-  theirTradeTotal: document.querySelector("#theirTradeTotal"),
-  myTradeCount: document.querySelector("#myTradeCount"),
-  theirTradeCount: document.querySelector("#theirTradeCount"),
-  tradeRating: document.querySelector("#tradeRating"),
-  tradeDifference: document.querySelector("#tradeDifference"),
-  tradeAdvice: document.querySelector("#tradeAdvice"),
-  tradeSearchInput: document.querySelector("#tradeSearchInput"),
-  tradeCollectionGrid: document.querySelector("#tradeCollectionGrid"),
-  tradeCollectionEmpty: document.querySelector("#tradeCollectionEmpty"),
-  otherTradeForm: document.querySelector("#otherTradeForm"),
-  otherTradeNameInput: document.querySelector("#otherTradeNameInput"),
-  otherTradeValueInput: document.querySelector("#otherTradeValueInput"),
-  otherTradeQtyInput: document.querySelector("#otherTradeQtyInput"),
-  otherTradeList: document.querySelector("#otherTradeList"),
-  otherTradeEmpty: document.querySelector("#otherTradeEmpty"),
+  ledgerView: document.querySelector("#ledgerView"),
+  ledgerTotalValue: document.querySelector("#ledgerTotalValue"),
+  ledgerWeekChange: document.querySelector("#ledgerWeekChange"),
+  ledgerSellCandidates: document.querySelector("#ledgerSellCandidates"),
+  ledgerNeedsCheck: document.querySelector("#ledgerNeedsCheck"),
+  ledgerInsights: document.querySelector("#ledgerInsights"),
+  ledgerStatusFilters: document.querySelector("#ledgerStatusFilters"),
+  ledgerSearchInput: document.querySelector("#ledgerSearchInput"),
+  ledgerSortSelect: document.querySelector("#ledgerSortSelect"),
+  ledgerTable: document.querySelector("#ledgerTable"),
+  ledgerCards: document.querySelector("#ledgerCards"),
+  ledgerEmpty: document.querySelector("#ledgerEmpty"),
+  ledgerTableViewButton: document.querySelector("#ledgerTableViewButton"),
+  ledgerCardViewButton: document.querySelector("#ledgerCardViewButton"),
   authForm: document.querySelector("#authForm"),
   signupButton: document.querySelector("#signupButton"),
   logoutButton: document.querySelector("#logoutButton"),
@@ -252,8 +249,8 @@ let detailSide = "front";
 let editingCard = null;
 let collectionView = "active";
 let activeAppView = "home";
-let myTradeCardIds = new Set();
-let otherTradeItems = [];
+let activeLedgerStatus = "all";
+let ledgerViewMode = "table";
 let scanPreviewUrls = [];
 let scanDuplicateCard = null;
 let scanOcrWorker = null;
@@ -311,9 +308,17 @@ function bindEvents() {
   elements.exportCsvButton.addEventListener("click", exportCollectionCsv);
   elements.exportJsonButton.addEventListener("click", exportCollectionJson);
   elements.exportSummaryButton.addEventListener("click", exportCollectionSummary);
-  elements.clearTradeButton.addEventListener("click", clearTrade);
-  elements.tradeSearchInput.addEventListener("input", renderTradeBuilder);
-  elements.otherTradeForm.addEventListener("submit", addOtherTradeItem);
+  elements.ledgerSearchInput.addEventListener("input", renderLedger);
+  elements.ledgerSortSelect.addEventListener("change", renderLedger);
+  elements.ledgerStatusFilters.addEventListener("click", event => {
+    const button = event.target.closest("[data-ledger-status]");
+    if (!button) return;
+    activeLedgerStatus = button.dataset.ledgerStatus;
+    setActiveChip(elements.ledgerStatusFilters, button);
+    renderLedger();
+  });
+  elements.ledgerTableViewButton.addEventListener("click", () => setLedgerViewMode("table"));
+  elements.ledgerCardViewButton.addEventListener("click", () => setLedgerViewMode("cards"));
   elements.lookupCardForm.addEventListener("submit", searchCardSightForNewCard);
   elements.scanFrontInput.addEventListener("change", () => previewScanPhoto(elements.scanFrontInput, elements.scanFrontPreview));
   elements.scanBackInput.addEventListener("change", () => previewScanPhoto(elements.scanBackInput, elements.scanBackPreview));
@@ -550,8 +555,8 @@ async function loadCards() {
   // the collection.
   renderCards();
 
-  if (activeAppView === "trade") {
-    renderTradeBuilder();
+  if (activeAppView === "ledger") {
+    renderLedger();
   }
 
   // Load private Storage URLs in the background.
@@ -601,8 +606,8 @@ async function attachSignedPhotoUrls(cardRows) {
       // longer block every card from appearing.
       renderCards();
 
-      if (activeAppView === "trade") {
-        renderTradeBuilder();
+      if (activeAppView === "ledger") {
+        renderLedger();
       }
     })
   );
@@ -2448,229 +2453,305 @@ function openScanPricingSearch(){const q=[elements.scanYearSuggestion.value,elem
 function resetScanAssistant(){elements.scanFrontInput.value="";elements.scanBackInput.value="";scanPreviewUrls.forEach(URL.revokeObjectURL);scanPreviewUrls=[];[elements.scanFrontPreview,elements.scanBackPreview].forEach(p=>{p.removeAttribute("src");p.classList.add("hidden")});[elements.scanPlayerSuggestion,elements.scanYearSuggestion,elements.scanBrandSuggestion,elements.scanSetSuggestion,elements.scanNumberSuggestion,elements.scanParallelSuggestion,elements.scanValueSuggestion].forEach(i=>i.value="");elements.scanSportSuggestion.value="Other";elements.scanRookieSuggestion.checked=false;elements.scanResults.classList.add("hidden");elements.scanPlaceholder.classList.remove("hidden");elements.scanProgressWrap.classList.add("hidden");elements.scanMessage.textContent="";elements.cardSightMessage.textContent="";elements.cardSightResults.replaceChildren();elements.cardSightSearchInput.value="";selectedCardSightCard=null;scanDuplicateCard=null;updateDuplicateWarning()}
 function setScanProgress(p,m){elements.scanProgressBar.style.width=`${Math.max(0,Math.min(100,p))}%`;elements.scanProgressText.textContent=m}
 
-function renderTradeBuilder() {
-  const activeCards = cards.filter(card => !card.deleted_at);
-  const query = elements.tradeSearchInput.value.trim().toLowerCase();
+// ---- Vault Ledger: value history (real data only, no fabricated market feed) ----
+const PORTFOLIO_HISTORY_KEY = "rookie-vault-portfolio-history";
+const CARD_VALUE_HISTORY_KEY = "rookie-vault-card-value-history";
+const NEEDS_CHECK_DAYS = 30;
 
-  const filtered = activeCards.filter(card => {
+function recordPortfolioSnapshot(total) {
+  const today = new Date().toISOString().slice(0, 10);
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem(PORTFOLIO_HISTORY_KEY) || "[]");
+  } catch {
+    history = [];
+  }
+
+  const existingToday = history.find(entry => entry.date === today);
+  if (existingToday) {
+    existingToday.total = total;
+  } else {
+    history.push({ date: today, total });
+  }
+
+  history = history.slice(-90);
+  localStorage.setItem(PORTFOLIO_HISTORY_KEY, JSON.stringify(history));
+  return history;
+}
+
+function getPortfolioChangeVsDaysAgo(history, days = 7) {
+  if (history.length < 2) return null;
+
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const past = [...history]
+    .filter(entry => new Date(entry.date).getTime() <= cutoff)
+    .pop();
+
+  if (!past || past.total <= 0) return null;
+
+  const latest = history[history.length - 1].total;
+  return ((latest - past.total) / past.total) * 100;
+}
+
+function recordCardValueSnapshot(cardId, value) {
+  let store = {};
+  try {
+    store = JSON.parse(localStorage.getItem(CARD_VALUE_HISTORY_KEY) || "{}");
+  } catch {
+    store = {};
+  }
+
+  const entries = store[cardId] || [];
+  entries.push({ at: new Date().toISOString(), value: Number(value) || 0 });
+  store[cardId] = entries.slice(-8);
+
+  localStorage.setItem(CARD_VALUE_HISTORY_KEY, JSON.stringify(store));
+}
+
+function getCardValueChangePercent(cardId) {
+  let store = {};
+  try {
+    store = JSON.parse(localStorage.getItem(CARD_VALUE_HISTORY_KEY) || "{}");
+  } catch {
+    store = {};
+  }
+
+  const entries = store[cardId];
+  if (!entries || entries.length < 2) return null;
+
+  const previous = entries[entries.length - 2].value;
+  const latest = entries[entries.length - 1].value;
+  if (!previous) return null;
+
+  return ((latest - previous) / previous) * 100;
+}
+
+function daysSince(isoDate) {
+  if (!isoDate) return Infinity;
+  return (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24);
+}
+
+function setLedgerViewMode(mode) {
+  ledgerViewMode = mode;
+  elements.ledgerTableViewButton.classList.toggle("active", mode === "table");
+  elements.ledgerCardViewButton.classList.toggle("active", mode === "cards");
+  elements.ledgerTable.classList.toggle("hidden", mode !== "table");
+  elements.ledgerCards.classList.toggle("hidden", mode !== "cards");
+}
+
+function renderLedger() {
+  const activeCards = cards.filter(card => !card.deleted_at);
+
+  const totalValue = activeCards.reduce(
+    (sum, card) => sum + Number(card.estimated_value || 0) * Math.max(1, Number(card.quantity || 1)),
+    0
+  );
+
+  const history = recordPortfolioSnapshot(totalValue);
+  const weekChange = getPortfolioChangeVsDaysAgo(history, 7);
+
+  const sellCandidates = activeCards.filter(
+    card => card.status === "trade" || card.status === "duplicate"
+  ).length;
+
+  const needsCheck = activeCards.filter(
+    card => daysSince(card.price_checked_at) > NEEDS_CHECK_DAYS
+  );
+
+  elements.ledgerTotalValue.textContent = currency(totalValue);
+  elements.ledgerWeekChange.textContent =
+    weekChange === null
+      ? "New"
+      : `${weekChange > 0 ? "+" : ""}${weekChange.toFixed(1)}%`;
+  elements.ledgerSellCandidates.textContent = String(sellCandidates);
+  elements.ledgerNeedsCheck.textContent = String(needsCheck.length);
+
+  renderLedgerInsights(activeCards, needsCheck);
+
+  const query = elements.ledgerSearchInput.value.trim().toLowerCase();
+  const sort = elements.ledgerSortSelect.value;
+
+  let filtered = activeCards.filter(card => {
+    const matchesStatus =
+      activeLedgerStatus === "all" || card.status === activeLedgerStatus;
+
     const haystack = [
       card.player_name,
       card.sport,
       card.brand,
       card.set_name,
       card.card_number,
-      card.parallel_name,
-      card.grade,
-      card.grading_company
+      card.parallel_name
     ].filter(Boolean).join(" ").toLowerCase();
 
-    return haystack.includes(query);
+    return matchesStatus && haystack.includes(query);
   });
 
-  elements.tradeCollectionGrid.replaceChildren();
+  filtered = sortLedgerCards(filtered, sort);
 
-  for (const card of filtered) {
-    const selected = myTradeCardIds.has(card.id);
+  elements.ledgerEmpty.classList.toggle("hidden", filtered.length > 0);
+  renderLedgerTable(filtered);
+  renderLedgerCardGrid(filtered);
+}
 
-    const article = document.createElement("article");
-    article.className = `trade-select-card${selected ? " selected" : ""}`;
+function sortLedgerCards(list, sort) {
+  const sorted = [...list];
+
+  if (sort === "value-asc") {
+    sorted.sort((a, b) => Number(a.estimated_value || 0) - Number(b.estimated_value || 0));
+  } else if (sort === "needs-check") {
+    sorted.sort((a, b) => daysSince(b.price_checked_at) - daysSince(a.price_checked_at));
+  } else if (sort === "recent") {
+    sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  } else {
+    sorted.sort((a, b) => Number(b.estimated_value || 0) - Number(a.estimated_value || 0));
+  }
+
+  return sorted;
+}
+
+function renderLedgerInsights(activeCards, needsCheck) {
+  elements.ledgerInsights.replaceChildren();
+
+  const insights = [];
+  const duplicates = activeCards.filter(card => card.status === "duplicate").length;
+  const forTrade = activeCards.filter(card => card.status === "trade").length;
+
+  if (duplicates > 0) {
+    insights.push(`${duplicates} duplicate${duplicates === 1 ? "" : "s"} ready to list on eBay`);
+  }
+  if (forTrade > 0) {
+    insights.push(`${forTrade} card${forTrade === 1 ? "" : "s"} marked for trade`);
+  }
+  if (needsCheck.length > 0) {
+    insights.push(`${needsCheck.length} card${needsCheck.length === 1 ? "" : "s"} haven't been price-checked in ${NEEDS_CHECK_DAYS}+ days`);
+  }
+  if (!insights.length) {
+    insights.push("Everything's been checked recently. Nothing needs attention.");
+  }
+
+  for (const text of insights) {
+    const chip = document.createElement("span");
+    chip.className = "ledger-insight-chip";
+    chip.textContent = text;
+    elements.ledgerInsights.append(chip);
+  }
+}
+
+function renderLedgerTable(list) {
+  elements.ledgerTable.replaceChildren();
+
+  for (const card of list) {
+    const row = document.createElement("article");
+    row.className = "ledger-row";
+
+    const changePercent = getCardValueChangePercent(card.id);
+    row.classList.add(
+      changePercent === null ? "flat" : changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat"
+    );
 
     const thumb = document.createElement("div");
-    thumb.className = "trade-thumb";
-
+    thumb.className = "ledger-thumb";
     if (card.front_photo_url) {
       const image = document.createElement("img");
       image.src = card.front_photo_url;
       image.alt = `Front of ${card.player_name}`;
       thumb.append(image);
-    } else {
-      thumb.textContent = "No photo";
     }
 
     const info = document.createElement("div");
-    info.className = "trade-select-info";
+    info.className = "ledger-row-info";
+    const name = document.createElement("strong");
+    name.textContent = card.player_name;
+    const meta = document.createElement("span");
+    meta.textContent = [card.card_year, card.brand, card.set_name].filter(Boolean).join(" • ");
+    info.append(name, meta);
+
+    const value = document.createElement("span");
+    value.className = "ledger-row-value";
+    value.textContent = currency(Number(card.estimated_value || 0) * Math.max(1, Number(card.quantity || 1)));
+
+    const change = document.createElement("span");
+    change.className = "ledger-row-change";
+    change.textContent =
+      changePercent === null
+        ? "—"
+        : `${changePercent > 0 ? "▲" : changePercent < 0 ? "▼" : ""} ${Math.abs(changePercent).toFixed(0)}%`;
+
+    const actions = document.createElement("div");
+    actions.className = "ledger-row-actions";
+
+    const searchLink = document.createElement("button");
+    searchLink.type = "button";
+    searchLink.className = "ledger-icon-button";
+    searchLink.title = "Search sold prices on eBay";
+    searchLink.innerHTML = '<span aria-hidden="true">$</span>';
+    searchLink.addEventListener("click", event => {
+      event.stopPropagation();
+      const q = encodeURIComponent(buildPricingSearch(card));
+      window.open(`https://www.ebay.com/sch/i.html?_nkw=${q}&LH_Complete=1&LH_Sold=1`, "_blank", "noopener,noreferrer");
+    });
+
+    const detailLink = document.createElement("button");
+    detailLink.type = "button";
+    detailLink.className = "ledger-icon-button";
+    detailLink.title = "Open card details";
+    detailLink.innerHTML = '<span aria-hidden="true">↗</span>';
+    detailLink.addEventListener("click", event => {
+      event.stopPropagation();
+      openCardDialog(card);
+    });
+
+    actions.append(searchLink, detailLink);
+    row.append(thumb, info, value, change, actions);
+    row.addEventListener("click", () => openCardDialog(card));
+    elements.ledgerTable.append(row);
+  }
+}
+
+function renderLedgerCardGrid(list) {
+  elements.ledgerCards.replaceChildren();
+
+  for (const card of list) {
+    const changePercent = getCardValueChangePercent(card.id);
+
+    const article = document.createElement("article");
+    article.className = `ledger-grid-card ${changePercent === null ? "flat" : changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat"}`;
+    article.addEventListener("click", () => openCardDialog(card));
+
+    const thumb = document.createElement("div");
+    thumb.className = "ledger-thumb";
+    if (card.front_photo_url) {
+      const image = document.createElement("img");
+      image.src = card.front_photo_url;
+      image.alt = `Front of ${card.player_name}`;
+      thumb.append(image);
+    }
 
     const name = document.createElement("strong");
     name.textContent = card.player_name;
 
     const meta = document.createElement("span");
-    meta.textContent = [
-      card.card_year,
-      card.brand,
-      card.set_name,
-      card.card_number ? `#${card.card_number}` : null
-    ].filter(Boolean).join(" • ");
+    meta.textContent = [card.card_year, card.brand].filter(Boolean).join(" • ");
 
-    info.append(name, meta);
+    const value = document.createElement("span");
+    value.className = "ledger-row-value";
+    value.textContent = currency(Number(card.estimated_value || 0) * Math.max(1, Number(card.quantity || 1)));
 
-    const actions = document.createElement("div");
-    actions.className = "trade-select-actions";
+    const change = document.createElement("span");
+    change.className = "ledger-row-change";
+    change.textContent =
+      changePercent === null
+        ? "—"
+        : `${changePercent > 0 ? "▲" : changePercent < 0 ? "▼" : ""} ${Math.abs(changePercent).toFixed(0)}%`;
 
-    const value = document.createElement("strong");
-    value.textContent = currency(tradeCardTotal(card));
-
-    const button = document.createElement("button");
-    button.className = "trade-toggle-button";
-    button.type = "button";
-    button.textContent = selected ? "Remove" : "Add";
-    button.addEventListener("click", () => toggleMyTradeCard(card.id));
-
-    actions.append(value, button);
-    article.append(thumb, info, actions);
-    elements.tradeCollectionGrid.append(article);
+    article.append(thumb, name, meta, value, change);
+    elements.ledgerCards.append(article);
   }
-
-  elements.tradeCollectionEmpty.classList.toggle("hidden", filtered.length > 0);
-  renderOtherTradeItems();
-  updateTradeSummary();
-}
-
-function toggleMyTradeCard(cardId) {
-  if (myTradeCardIds.has(cardId)) {
-    myTradeCardIds.delete(cardId);
-  } else {
-    myTradeCardIds.add(cardId);
-  }
-
-  renderTradeBuilder();
-}
-
-function addOtherTradeItem(event) {
-  event.preventDefault();
-
-  const name = elements.otherTradeNameInput.value.trim();
-  const value = Number(elements.otherTradeValueInput.value || 0);
-  const quantity = Math.max(1, Number(elements.otherTradeQtyInput.value || 1));
-
-  if (!name || !Number.isFinite(value) || value < 0) return;
-
-  otherTradeItems.push({
-    id: crypto.randomUUID(),
-    name,
-    value,
-    quantity
-  });
-
-  elements.otherTradeForm.reset();
-  elements.otherTradeQtyInput.value = "1";
-  renderTradeBuilder();
-}
-
-function renderOtherTradeItems() {
-  elements.otherTradeList.replaceChildren();
-
-  for (const item of otherTradeItems) {
-    const article = document.createElement("article");
-    article.className = "other-trade-item";
-
-    const info = document.createElement("div");
-    const name = document.createElement("strong");
-    name.textContent = item.name;
-
-    const meta = document.createElement("span");
-    meta.textContent = `${item.quantity} × ${currency(item.value)}`;
-
-    info.append(name, meta);
-
-    const total = document.createElement("strong");
-    total.textContent = currency(item.value * item.quantity);
-
-    const remove = document.createElement("button");
-    remove.className = "remove-trade-button";
-    remove.type = "button";
-    remove.textContent = "Remove";
-    remove.addEventListener("click", () => {
-      otherTradeItems = otherTradeItems.filter(entry => entry.id !== item.id);
-      renderTradeBuilder();
-    });
-
-    article.append(info, total, remove);
-    elements.otherTradeList.append(article);
-  }
-
-  elements.otherTradeEmpty.classList.toggle("hidden", otherTradeItems.length > 0);
-}
-
-function updateTradeSummary() {
-  const myCards = cards.filter(
-    card => !card.deleted_at && myTradeCardIds.has(card.id)
-  );
-
-  const myTotal = myCards.reduce(
-    (sum, card) => sum + tradeCardTotal(card),
-    0
-  );
-
-  const theirTotal = otherTradeItems.reduce(
-    (sum, item) => sum + item.value * item.quantity,
-    0
-  );
-
-  const difference = theirTotal - myTotal;
-  const absoluteDifference = Math.abs(difference);
-  const comparisonBase = Math.max(myTotal, theirTotal, 1);
-  const percentDifference = absoluteDifference / comparisonBase;
-
-  elements.myTradeTotal.textContent = currency(myTotal);
-  elements.theirTradeTotal.textContent = currency(theirTotal);
-  elements.myTradeCount.textContent = countLabel(
-    myCards.reduce((sum, card) => sum + Math.max(1, Number(card.quantity || 1)), 0)
-  );
-  elements.theirTradeCount.textContent = countLabel(
-    otherTradeItems.reduce((sum, item) => sum + item.quantity, 0)
-  );
-
-  elements.tradeDifference.textContent =
-    `${currency(absoluteDifference)} difference`;
-
-  if (myTotal <= 0 || theirTotal <= 0) {
-    elements.tradeRating.textContent = "Add cards";
-    elements.tradeAdvice.textContent =
-      "Add at least one valued card to each side before judging the trade.";
-    return;
-  }
-
-  if (percentDifference <= 0.05) {
-    elements.tradeRating.textContent = "Very fair";
-    elements.tradeAdvice.textContent =
-      "The estimated values are within about 5%. Review condition, rarity, demand, and personal preference before agreeing.";
-  } else if (percentDifference <= 0.12) {
-    elements.tradeRating.textContent = "Close trade";
-    elements.tradeAdvice.textContent =
-      difference > 0
-        ? "The other side is slightly higher by estimated value. This may be favorable for Brenton, but verify grades and recent sales."
-        : "Brenton's side is slightly higher by estimated value. A small additional card or cash could balance the trade.";
-  } else if (percentDifference <= 0.25) {
-    elements.tradeRating.textContent = "Uneven";
-    elements.tradeAdvice.textContent =
-      difference > 0
-        ? "The other side is meaningfully higher by estimated value. Double-check that all incoming cards and conditions are entered correctly."
-        : "Brenton's side is meaningfully higher by estimated value. Consider asking for another card or cash.";
-  } else {
-    elements.tradeRating.textContent = "Very uneven";
-    elements.tradeAdvice.textContent =
-      difference > 0
-        ? "The other side is far higher by estimated value. This may indicate missing information or a highly favorable offer."
-        : "Brenton's side is far higher by estimated value. Do not proceed without reviewing recent comparable sales and condition.";
-  }
-}
-
-function tradeCardTotal(card) {
-  return Number(card.estimated_value || 0) *
-    Math.max(1, Number(card.quantity || 1));
 }
 
 function countLabel(count) {
   return `${count} ${count === 1 ? "card" : "cards"}`;
-}
-
-function clearTrade() {
-  myTradeCardIds.clear();
-  otherTradeItems = [];
-  elements.tradeSearchInput.value = "";
-  elements.otherTradeForm.reset();
-  elements.otherTradeQtyInput.value = "1";
-  renderTradeBuilder();
 }
 
 function exportCollectionCsv() {
@@ -2967,7 +3048,7 @@ function navigateTo(view) {
   const showHome = view === "home";
   const showAdd = view === "add";
   const showCollection = view === "collection" || view === "trash";
-  const showTrade = view === "trade";
+  const showLedger = view === "ledger";
   const showScan = view === "scan";
   const showSets = view === "sets";
   const showCardShow = view === "show";
@@ -2975,7 +3056,7 @@ function navigateTo(view) {
   elements.homeView.classList.toggle("hidden", !showHome);
   elements.addView.classList.toggle("hidden", !showAdd);
   elements.collectionView.classList.toggle("hidden", !showCollection);
-  elements.tradeView.classList.toggle("hidden", !showTrade);
+  elements.ledgerView.classList.toggle("hidden", !showLedger);
   elements.scanView.classList.toggle("hidden", !showScan);
   elements.setsView.classList.toggle("hidden", !showSets);
   elements.showView.classList.toggle("hidden", !showCardShow);
@@ -2999,8 +3080,8 @@ function navigateTo(view) {
     switchCollectionView("trash");
   }
 
-  if (view === "trade") {
-    renderTradeBuilder();
+  if (view === "ledger") {
+    renderLedger();
   }
 
   if (view === "sets") {
@@ -3449,8 +3530,10 @@ async function savePricingResearch(event) {
   elements.priceResearchDate.textContent = `Checked ${formatShortDate(checkedAt)}`;
   elements.pricingMessage.textContent = "Pricing research saved.";
 
+  recordCardValueSnapshot(selectedCard.id, value);
+
   renderCards();
-  if (activeAppView === "trade") renderTradeBuilder();
+  if (activeAppView === "ledger") renderLedger();
 }
 
 function formatPriceResearch(card) {

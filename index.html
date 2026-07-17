@@ -733,86 +733,63 @@
         </section>
       </section>
 
-      <section id="tradeView" class="app-view hidden">
-        <section class="panel">
+      <section id="ledgerView" class="app-view hidden">
+        <section class="panel ledger-panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow accent-text">Trade assistant</p>
-              <h2>Build a trade</h2>
-              <p class="muted">Compare estimated values on both sides. This is guidance, not a guarantee.</p>
+              <p class="eyebrow accent-text">Inventory</p>
+              <h2>Vault Ledger</h2>
+              <p class="muted">Value, status, and eBay research for every card in one place.</p>
             </div>
-            <button id="clearTradeButton" class="button button-secondary" type="button">Clear trade</button>
+            <div class="ledger-view-toggle">
+              <button id="ledgerTableViewButton" class="button button-secondary active" type="button">Table</button>
+              <button id="ledgerCardViewButton" class="button button-secondary" type="button">Cards</button>
+            </div>
           </div>
 
-          <div class="trade-summary-grid">
-            <article class="trade-total-card">
-              <span>Brenton's side</span>
-              <strong id="myTradeTotal">$0.00</strong>
-              <small id="myTradeCount">0 cards</small>
+          <div class="show-kpi-grid">
+            <article class="show-kpi">
+              <span>Total value</span>
+              <strong id="ledgerTotalValue">$0.00</strong>
             </article>
-
-            <article class="trade-rating-card">
-              <span>Trade rating</span>
-              <strong id="tradeRating">Add cards</strong>
-              <small id="tradeDifference">$0.00 difference</small>
+            <article class="show-kpi">
+              <span>This week</span>
+              <strong id="ledgerWeekChange">New</strong>
             </article>
-
-            <article class="trade-total-card">
-              <span>Other side</span>
-              <strong id="theirTradeTotal">$0.00</strong>
-              <small id="theirTradeCount">0 cards</small>
+            <article class="show-kpi">
+              <span>Sell candidates</span>
+              <strong id="ledgerSellCandidates">0</strong>
+            </article>
+            <article class="show-kpi">
+              <span>Needs price check</span>
+              <strong id="ledgerNeedsCheck">0</strong>
             </article>
           </div>
 
-          <div class="trade-layout">
-            <section class="trade-column">
-              <div class="trade-column-header">
-                <div>
-                  <p class="eyebrow accent-text">Your collection</p>
-                  <h3>Brenton's side</h3>
-                </div>
-                <input id="tradeSearchInput" class="search" type="search" placeholder="Search collection...">
-              </div>
+          <div id="ledgerInsights" class="ledger-insights"></div>
 
-              <div id="tradeCollectionGrid" class="trade-card-grid"></div>
-              <p id="tradeCollectionEmpty" class="empty-state">No matching active cards.</p>
-            </section>
+          <div class="show-toolbar">
+            <div class="filter-row" id="ledgerStatusFilters">
+              <button class="filter-chip active" type="button" data-ledger-status="all">All</button>
+              <button class="filter-chip" type="button" data-ledger-status="keep">Keep</button>
+              <button class="filter-chip" type="button" data-ledger-status="trade">For trade</button>
+              <button class="filter-chip" type="button" data-ledger-status="duplicate">Duplicate</button>
+              <button class="filter-chip" type="button" data-ledger-status="want">Want list</button>
+            </div>
 
-            <section class="trade-column">
-              <div class="trade-column-header">
-                <div>
-                  <p class="eyebrow accent-text">Incoming cards</p>
-                  <h3>Other side</h3>
-                </div>
-              </div>
+            <input id="ledgerSearchInput" class="search" type="search" placeholder="Search inventory...">
 
-              <form id="otherTradeForm" class="trade-entry-form">
-                <label>Card description
-                  <input id="otherTradeNameInput" required maxlength="160" placeholder="2023 Prizm CJ Stroud Silver">
-                </label>
-
-                <label>Estimated value
-                  <input id="otherTradeValueInput" type="number" min="0" step="0.01" required inputmode="decimal">
-                </label>
-
-                <label>Quantity
-                  <input id="otherTradeQtyInput" type="number" min="1" step="1" value="1" required inputmode="numeric">
-                </label>
-
-                <button class="button" type="submit">Add to other side</button>
-              </form>
-
-              <div id="otherTradeList" class="other-trade-list"></div>
-              <p id="otherTradeEmpty" class="empty-state">No incoming cards added yet.</p>
-            </section>
+            <select id="ledgerSortSelect">
+              <option value="value-desc">Value: high to low</option>
+              <option value="value-asc">Value: low to high</option>
+              <option value="needs-check">Needs price check first</option>
+              <option value="recent">Recently added</option>
+            </select>
           </div>
 
-          <section class="trade-notes-card">
-            <h3>How the rating works</h3>
-            <p id="tradeAdvice">
-              Add cards to both sides to compare estimated value ranges.
-            </p>
-          </section>
+          <div id="ledgerTable" class="ledger-table"></div>
+          <div id="ledgerCards" class="ledger-card-grid hidden"></div>
+          <p id="ledgerEmpty" class="empty-state hidden">No cards match this filter.</p>
         </section>
       </section>
 
@@ -829,9 +806,9 @@
           <span class="nav-icon" aria-hidden="true">⌾</span>
           <span>Lookup</span>
         </button>
-        <button class="nav-button" type="button" data-view="trade">
-          <span class="nav-icon" aria-hidden="true">⇄</span>
-          <span>Trade</span>
+        <button class="nav-button" type="button" data-view="ledger">
+          <span class="nav-icon" aria-hidden="true">▤</span>
+          <span>Ledger</span>
         </button>
         <button class="nav-button" type="button" data-view="trash">
           <span class="nav-icon" aria-hidden="true">♲</span>
