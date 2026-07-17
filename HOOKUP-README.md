@@ -1,7 +1,8 @@
 # Rookie Vault - Small Wins Update (v24)
 
-Four changes, all additive except one: the Trade tab is replaced by a new
-**Vault Ledger** inventory view. No Supabase migration needed.
+Five changes. The Trade tab is replaced by a Vault Ledger inventory view,
+and dark mode is now true black with red accents. No Supabase migration
+needed.
 
 **Everything in this bundle is a ready-to-extract, drop-in replacement.**
 `index.html` already has the ledger view, sports feed panel, and version
@@ -21,7 +22,50 @@ existing files with these.
 
 Keep as-is (not in this bundle): `js/config.js`
 
-## 0. Vault Ledger replaces Trade
+## 1. Dark mode: true black + red
+
+This completely replaces the old maroon dark theme — you asked to replace
+it outright, not add a second option. Light mode (your maroon branding) is
+untouched.
+
+- Background is genuine black (`#000000`), not dark gray.
+- Accent color is a vivid red (`#ff2b4d`) instead of the muted maroon.
+- Cards, panels, and KPI tiles now use a shadow that includes a soft red
+  glow, which is what gives them the "floating" look — this was a
+  one-line change to the shared `--shadow` variable, so it applies
+  automatically to every card that already used it (stats, panels,
+  ledger rows, show-mode KPIs, collection cards).
+- "Needs price check" (danger color) is now orange instead of red, so it
+  reads as a distinct alert against the red brand accent instead of
+  blending in.
+
+Because the whole app already used CSS custom properties consistently,
+this was genuinely a small, contained change — one variable block in
+`css/app.css`, plus giving `.show-kpi` and the ledger rows a matching
+border/shadow so they float too. Nothing else needed touching.
+
+## 2. Sports ticker: now an actual scrolling ticker
+
+The old score panel was a static stacked list. It's now a real, continuously
+scrolling marquee (hover or focus on it to pause and read), and it merges
+three things — all real, computed data, nothing simulated:
+
+- **Live/recent scores**, same as before.
+- **Card value moves** — pulled straight from the Vault Ledger's own
+  price-check history (the same real data described below), so a card
+  showing "▲ 9%" in the ledger will also show up in the ticker. Tapping
+  one opens that card's detail dialog.
+- **"In your vault" trending news** — headlines from ESPN that happen to
+  mention a player already in the collection. This is a straightforward
+  text match against player names already in the database, not a
+  trending/buzz score from anywhere.
+
+It also flashes briefly when a live score actually changes since the last
+check (tracked in memory, compared on each refresh) — real change
+detection, not a random animation. Tapping a score opens that league's
+ESPN scoreboard; tapping a card-move item opens the card in the app.
+
+## 3. Vault Ledger replaces Trade
 
 The old two-sided trade calculator is gone. In its place, on the same nav
 slot: an inventory view built around what you actually said you wanted —
@@ -65,7 +109,7 @@ any row opens the existing card detail dialog, same as the collection view.
 The $ icon opens an eBay sold-listings search for that exact card (reusing
 your existing search-string builder); the ↗ icon opens the card detail.
 
-## 1. CardSight: real year/brand filters + fewer wasted calls
+## 4. CardSight: real year/brand filters + fewer wasted calls
 
 Both the lookup form and the scan/catalog quick search now send CardSight's
 actual `year` and `brand` params (per their API docs) instead of only
@@ -93,7 +137,7 @@ different casing or names (e.g. `cardYear`), it's a one-line fix in
 `searchCardSightNarrowed` near the top of `app.js` — the fallback keeps it
 safe in the meantime either way.
 
-## 2. Card detail flip animation
+## 5. Card detail flip animation
 
 Tapping "Front"/"Back" on a card's detail view now does a quick rotateY
 flip (edge-on, swap the photo, rotate back) instead of an instant image
@@ -101,7 +145,7 @@ swap. It's CSS + a small JS timing change only — same buttons, same photo
 element, no new markup needed. First time a card's dialog opens there's no
 animation (avoids a flash before any photo has loaded).
 
-## 3. Live scores + news feed
+## 6. Live scores + news feed (base panel)
 
 Already wired into `index.html` in this bundle: the panel sits on the Home
 view between the welcome card and your stats grid, the stylesheet and
@@ -134,18 +178,21 @@ worker takes over cleanly.
 
 Test in this order so a problem is easy to isolate:
 1. Load the app normally, confirm existing collection/photos still render.
-2. Open the Ledger tab (bottom nav, replaces where Trade was). Confirm the
+2. Switch to dark mode — confirm it's true black with red accents, and that
+   text is still readable everywhere (KPI cards, ledger, forms).
+3. Open the Ledger tab (bottom nav, replaces where Trade was). Confirm the
    metric strip shows real numbers and doesn't error in the console.
-3. Save pricing research on a card twice (a few minutes apart is fine) and
-   confirm the ledger row shows a real up/down % on the second save.
-4. Run a CardSight lookup search with a year and brand filled in — check the
+4. Check the ticker on Home — it should be scrolling continuously, and
+   pause when you hover/focus it.
+5. Save pricing research on a card twice (a few minutes apart is fine) and
+   confirm the ledger row shows a real up/down % on the second save, and
+   that it also appears in the ticker.
+6. Run a CardSight lookup search with a year and brand filled in — check the
    result message for "(narrowed by year/brand)" to confirm the real params
    worked.
-5. Open a card's detail view and tap Front/Back to see the flip.
-6. Check the "Live scores & news" panel on Home loads without errors (open
-   browser dev tools console if it looks empty).
+7. Open a card's detail view and tap Front/Back to see the flip.
 
 ## Suggested commit
 
-`Replace Trade tab with Vault Ledger, add CardSight year/brand filters with fallback, card flip animation, live scores/news feed`
+`True black + red dark theme, scrolling ticker with real card moves, Vault Ledger replaces Trade, CardSight year/brand filters, card flip animation`
 

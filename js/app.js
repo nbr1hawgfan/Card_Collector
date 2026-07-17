@@ -555,9 +555,7 @@ async function loadCards() {
   // the collection.
   renderCards();
 
-  if (activeAppView === "ledger") {
-    renderLedger();
-  }
+  renderLedger();
 
   // Load private Storage URLs in the background.
   void attachSignedPhotoUrls(cards);
@@ -606,9 +604,7 @@ async function attachSignedPhotoUrls(cardRows) {
       // longer block every card from appearing.
       renderCards();
 
-      if (activeAppView === "ledger") {
-        renderLedger();
-      }
+      renderLedger();
     })
   );
 }
@@ -2592,6 +2588,33 @@ function renderLedger() {
   elements.ledgerEmpty.classList.toggle("hidden", filtered.length > 0);
   renderLedgerTable(filtered);
   renderLedgerCardGrid(filtered);
+
+  broadcastLedgerDataForTicker(activeCards);
+}
+
+// The sports feed ticker (a separate module) reads this real, computed data
+// via a small window bridge rather than fabricating any "hot card" signal.
+function broadcastLedgerDataForTicker(activeCards) {
+  const moves = activeCards
+    .map(card => ({
+      id: card.id,
+      label: card.player_name,
+      change: getCardValueChangePercent(card.id)
+    }))
+    .filter(move => move.change !== null)
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
+    .slice(0, 5);
+
+  window.rookieVaultCardMoves = moves;
+  window.rookieVaultCollectionPlayers = [
+    ...new Set(activeCards.map(card => card.player_name).filter(Boolean))
+  ];
+  window.rookieVaultOpenCard = cardId => {
+    const card = cards.find(c => c.id === cardId && !c.deleted_at);
+    if (card) openCardDialog(card);
+  };
+
+  window.dispatchEvent(new CustomEvent("rookie-vault-ledger-update"));
 }
 
 function sortLedgerCards(list, sort) {
@@ -3533,7 +3556,7 @@ async function savePricingResearch(event) {
   recordCardValueSnapshot(selectedCard.id, value);
 
   renderCards();
-  if (activeAppView === "ledger") renderLedger();
+  renderLedger();
 }
 
 function formatPriceResearch(card) {

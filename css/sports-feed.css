@@ -1,38 +1,85 @@
 /* Sports feed panel */
 .sports-feed-panel { margin-top: 1rem; }
-.sports-feed-scores { display: grid; gap: .55rem; margin-top: .8rem; }
-.sports-feed-score {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
-  gap: .65rem;
-  align-items: center;
-  padding: .65rem .7rem;
-  border: 1px solid var(--border);
+
+.sports-feed-scores {
+  margin-top: .8rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
   border-radius: 11px;
   background: var(--surface-2);
+  box-shadow: var(--shadow);
 }
-.sports-feed-league {
-  font-size: .68rem;
+
+@keyframes rv-ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.rv-ticker-track {
+  display: flex;
+  width: max-content;
+  animation-name: rv-ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Pause on hover/focus so it's readable on desktop without chasing text. */
+.sports-feed-scores:hover .rv-ticker-track,
+.sports-feed-scores:focus-within .rv-ticker-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-ticker-track { animation: none; }
+}
+
+.rv-ticker-row {
+  display: flex;
+  align-items: center;
+}
+
+.rv-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .55rem 1.1rem;
+  white-space: nowrap;
+  font-size: .82rem;
+  color: var(--text);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+}
+
+.rv-ticker-item:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+.rv-ticker-league {
+  font-size: .66rem;
   font-weight: 900;
   letter-spacing: .04em;
   color: var(--accent);
   text-transform: uppercase;
 }
-.sports-feed-matchup {
-  display: flex;
-  flex-direction: column;
-  gap: .2rem;
-  font-size: .85rem;
-  min-width: 0;
+
+.rv-ticker-status { font-size: .72rem; color: var(--muted); }
+.rv-ticker-live-dot { color: var(--accent); font-size: .6rem; animation: rv-live-pulse 1.4s ease-in-out infinite; }
+.rv-ticker-up { color: #26834f; font-weight: 800; }
+.rv-ticker-down { color: var(--danger); font-weight: 800; }
+
+@keyframes rv-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
 }
-.sports-feed-matchup strong { margin-left: .35rem; }
-.sports-feed-status {
-  font-size: .72rem;
-  font-weight: 800;
-  color: var(--muted);
-  white-space: nowrap;
+
+/* Real, on-device-detected score change - not decorative, only fires when
+   a game's score actually differs from the last check. */
+@keyframes rv-flash {
+  0%, 100% { background: transparent; }
+  30% { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 }
-.sports-feed-status.live { color: #26834f; }
+.rv-ticker-item.flash { animation: rv-flash 1.8s ease-out 1; }
+
+.rv-ticker-item.move .rv-ticker-league { color: var(--muted); }
+.rv-ticker-item.trending .rv-ticker-league { color: var(--accent); }
 
 .sports-feed-news {
   display: grid;
@@ -48,14 +95,15 @@
   background: var(--surface-2);
   color: var(--text);
   text-decoration: none;
-  font-size: .82rem;
+}
+.sports-feed-headline .sports-feed-league {
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  color: var(--accent);
+  text-transform: uppercase;
 }
 .sports-feed-headline:hover { border-color: var(--accent); }
-
-@media (max-width: 760px) {
-  .sports-feed-score { grid-template-columns: 44px minmax(0, 1fr); }
-  .sports-feed-status { grid-column: 2; }
-}
 
 /* Vault Ledger */
 .ledger-view-toggle { display: flex; gap: .5rem; }
@@ -88,6 +136,7 @@
   border-left: 3px solid var(--border);
   border-radius: 0 11px 11px 0;
   background: var(--surface-2);
+  box-shadow: var(--shadow);
   cursor: pointer;
 }
 .ledger-row.up { border-left-color: #26834f; }
@@ -137,6 +186,7 @@
   border-radius: 12px;
   border-left: 3px solid var(--border);
   background: var(--surface-2);
+  box-shadow: var(--shadow);
   cursor: pointer;
 }
 .ledger-grid-card.up { border-left-color: #26834f; }

@@ -1,6 +1,15 @@
 // Rookie Vault - Live scores and news feed
 // Uses ESPN's public site API (no key, no signup, no cost).
 // Same pattern as CardSight: favorite teams are stored on-device only.
+//
+// The ticker merges three real, computed streams - nothing here is
+// fabricated or simulated:
+//   1. Live/recent scores from ESPN, with a flash when a score actually
+//      changes between checks.
+//   2. Card value moves, read from the Vault Ledger's own price-check
+//      history via a small window bridge (js/app.js broadcasts it).
+//   3. News headlines that happen to mention a player already in the
+//      collection ("trending in your collection").
 
 const TEAMS_KEY = "rookie-vault-favorite-teams";
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes - keep requests light
@@ -13,6 +22,11 @@ const LEAGUES = {
 };
 
 const cache = new Map();
+const previousScores = new Map(); // eventId -> "awayScore-homeScore" seen last check
+
+let lastEvents = [];
+let lastArticles = [];
+let lastFavorites = [];
 
 const elements = {
   panel: document.querySelector("#sportsFeedPanel"),
@@ -21,7 +35,7 @@ const elements = {
   teamsInput: document.querySelector("#sportsFeedTeamsInput"),
   saveTeamsButton: document.querySelector("#saveSportsFeedTeamsButton"),
   refreshButton: document.querySelector("#refreshSportsFeedButton"),
-  scores: document.querySelector("#sportsFeedScores"),
+  ticker: document.querySelector("#sportsFeedScores"),
   news: document.querySelector("#sportsFeedNews"),
   message: document.querySelector("#sportsFeedMessage")
 };
@@ -46,6 +60,12 @@ export function initSportsFeed() {
   });
 
   elements.refreshButton?.addEventListener("click", () => loadFeed(true));
+
+  // Re-render the ticker (no re-fetch) whenever the Vault Ledger has fresh
+  // card-value data, e.g. after saving pricing research on a card.
+  window.addEventListener("rookie-vault-ledger-update", () => {
+    renderTicker(lastEvents, lastArticles, lastFavorites);
+  });
 
   loadFeed();
 }
@@ -81,17 +101,19 @@ async function loadFeed(force = false) {
   const favorites = getFavoriteTeams();
 
   elements.message.textContent = "Loading scores and news...";
-  elements.scores.replaceChildren();
-  elements.news.replaceChildren();
 
   try {
-    const [scores, news] = await Promise.all([
+    const [events, articles] = await Promise.all([
       loadScores(favorites, force),
       loadNews(favorites, force)
     ]);
 
-    renderScores(scores, favorites);
-    renderNews(news);
+    lastEvents = events;
+    lastArticles = articles;
+    lastFavorites = favorites;
+
+    renderTicker(events, articles, favorites);
+    renderNews(articles);
 
     elements.message.textContent = favorites.length
       ? `Showing results for: ${favorites.join(", ")}`
@@ -111,7 +133,7 @@ async function loadScores(favorites, force) {
           `https://site.api.espn.com/apis/site/v2/sports/${league.path}/scoreboard`,
           force
         );
-        return (data?.events || []).map(event => summarizeEvent(event, league.label));
+        return (data?.events || []).map(event => summarizeEvent(event, league.label, key));
       } catch (error) {
         console.warn(`Scoreboard failed for ${league.label}:`, error);
         return [];
@@ -161,24 +183,34 @@ async function loadNews(favorites, force) {
   return pool.slice(0, 6);
 }
 
-function summarizeEvent(event, leagueLabel) {
+function summarizeEvent(event, leagueLabel, leagueKey) {
   const competition = event.competitions?.[0];
   const competitors = competition?.competitors || [];
   const home = competitors.find(c => c.homeAway === "home");
   const away = competitors.find(c => c.homeAway === "away");
 
+  const homeScore = home?.score ?? "";
+  const awayScore = away?.score ?? "";
+  const scoreKey = `${awayScore}-${homeScore}`;
+
+  const previous = previousScores.get(event.id);
+  const justUpdated = Boolean(previous && previous !== scoreKey);
+  previousScores.set(event.id, scoreKey);
+
   return {
     id: event.id,
     league: leagueLabel,
+    leagueKey,
     status: event.status?.type?.shortDetail || "",
     isLive: event.status?.type?.state === "in",
+    justUpdated,
     home: {
       name: home?.team?.shortDisplayName || home?.team?.displayName || "TBD",
-      score: home?.score ?? ""
+      score: homeScore
     },
     away: {
       name: away?.team?.shortDisplayName || away?.team?.displayName || "TBD",
-      score: away?.score ?? ""
+      score: awayScore
     }
   };
 }
@@ -188,44 +220,146 @@ function matchesFavorites(event, favorites) {
   return favorites.some(team => text.includes(team.toLowerCase()));
 }
 
-function renderScores(events, favorites) {
-  if (!events.length) {
+// ---- Ticker: scores + real card value moves + trending news, merged ----
+
+function renderTicker(events, articles, favorites) {
+  const items = buildTickerItems(events, articles);
+
+  elements.ticker.replaceChildren();
+
+  if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "muted small";
     empty.textContent = favorites.length
       ? "No games found today for your favorite teams."
       : "No games found today.";
-    elements.scores.append(empty);
+    elements.ticker.append(empty);
     return;
   }
 
+  const track = document.createElement("div");
+  track.className = "rv-ticker-track";
+  // Slower for more items, but never painfully slow or too fast.
+  const duration = Math.min(60, Math.max(14, items.length * 2.4));
+  track.style.animationDuration = `${duration}s`;
+
+  // Render the item list twice back-to-back so the CSS marquee loop is
+  // seamless. The second copy is hidden from assistive tech.
+  track.append(buildTickerRow(items, false));
+  track.append(buildTickerRow(items, true));
+
+  elements.ticker.append(track);
+}
+
+function buildTickerItems(events, articles) {
+  const items = [];
+
   for (const event of events) {
-    const row = document.createElement("article");
-    row.className = "sports-feed-score";
-
-    const league = document.createElement("span");
-    league.className = "sports-feed-league";
-    league.textContent = event.league;
-
-    const matchup = document.createElement("div");
-    matchup.className = "sports-feed-matchup";
-    matchup.innerHTML = `
-      <span>${escapeHtml(event.away.name)} <strong>${escapeHtml(String(event.away.score))}</strong></span>
-      <span>${escapeHtml(event.home.name)} <strong>${escapeHtml(String(event.home.score))}</strong></span>
-    `;
-
-    const status = document.createElement("span");
-    status.className = event.isLive
-      ? "sports-feed-status live"
-      : "sports-feed-status";
-    status.textContent = event.status;
-
-    row.append(league, matchup, status);
-    elements.scores.append(row);
+    items.push({
+      type: "score",
+      justUpdated: event.justUpdated,
+      onClick: () => {
+        const espnLeague = LEAGUES[event.leagueKey]?.path;
+        if (espnLeague) {
+          window.open(
+            `https://www.espn.com/${espnLeague.split("/")[1]}/scoreboard`,
+            "_blank",
+            "noopener,noreferrer"
+          );
+        }
+      },
+      render: () => {
+        const wrap = document.createElement("span");
+        wrap.className = "rv-ticker-item";
+        if (event.isLive) wrap.classList.add("live");
+        if (event.justUpdated) wrap.classList.add("flash");
+        wrap.innerHTML = `
+          ${event.isLive ? '<span class="rv-ticker-live-dot">●</span>' : ""}
+          <span class="rv-ticker-league">${escapeHtml(event.league)}</span>
+          <span>${escapeHtml(event.away.name)} ${escapeHtml(String(event.away.score))} – ${escapeHtml(event.home.name)} ${escapeHtml(String(event.home.score))}</span>
+          <span class="rv-ticker-status">${escapeHtml(event.status)}</span>
+        `;
+        return wrap;
+      }
+    });
   }
+
+  const cardMoves = Array.isArray(window.rookieVaultCardMoves)
+    ? window.rookieVaultCardMoves
+    : [];
+
+  for (const move of cardMoves) {
+    items.push({
+      type: "move",
+      onClick: () => window.rookieVaultOpenCard?.(move.id),
+      render: () => {
+        const wrap = document.createElement("span");
+        wrap.className = "rv-ticker-item move";
+        const up = move.change > 0;
+        wrap.innerHTML = `
+          <span class="rv-ticker-league">Vault</span>
+          <span>${escapeHtml(move.label)}</span>
+          <span class="${up ? "rv-ticker-up" : "rv-ticker-down"}">${up ? "▲" : "▼"} ${Math.abs(move.change).toFixed(0)}%</span>
+        `;
+        return wrap;
+      }
+    });
+  }
+
+  const collectionPlayers = Array.isArray(window.rookieVaultCollectionPlayers)
+    ? window.rookieVaultCollectionPlayers
+    : [];
+
+  if (collectionPlayers.length) {
+    const trending = articles
+      .filter(article =>
+        collectionPlayers.some(player =>
+          article.headline.toLowerCase().includes(player.toLowerCase())
+        )
+      )
+      .slice(0, 2);
+
+    for (const article of trending) {
+      items.push({
+        type: "trending",
+        onClick: () => {
+          if (article.link) window.open(article.link, "_blank", "noopener,noreferrer");
+        },
+        render: () => {
+          const wrap = document.createElement("span");
+          wrap.className = "rv-ticker-item trending";
+          wrap.innerHTML = `
+            <span class="rv-ticker-league">🔥 In your vault</span>
+            <span>${escapeHtml(article.headline)}</span>
+          `;
+          return wrap;
+        }
+      });
+    }
+  }
+
+  return items;
+}
+
+function buildTickerRow(items, hidden) {
+  const row = document.createElement("div");
+  row.className = "rv-ticker-row";
+  if (hidden) row.setAttribute("aria-hidden", "true");
+
+  for (const item of items) {
+    const element = item.render();
+    element.setAttribute("role", "button");
+    element.tabIndex = hidden ? -1 : 0;
+    element.addEventListener("click", item.onClick);
+    row.append(element);
+  }
+
+  return row;
 }
 
 function renderNews(articles) {
+  elements.news.replaceChildren();
+
   if (!articles.length) {
     const empty = document.createElement("p");
     empty.className = "muted small";
@@ -234,14 +368,22 @@ function renderNews(articles) {
     return;
   }
 
+  const collectionPlayers = Array.isArray(window.rookieVaultCollectionPlayers)
+    ? window.rookieVaultCollectionPlayers
+    : [];
+
   for (const article of articles) {
+    const isTrending = collectionPlayers.some(player =>
+      article.headline.toLowerCase().includes(player.toLowerCase())
+    );
+
     const item = document.createElement("a");
     item.className = "sports-feed-headline";
     item.href = article.link || "#";
     item.target = "_blank";
     item.rel = "noopener";
     item.innerHTML = `
-      <span class="sports-feed-league">${escapeHtml(article.league)}</span>
+      <span class="sports-feed-league">${isTrending ? "🔥 " : ""}${escapeHtml(article.league)}</span>
       <span>${escapeHtml(article.headline)}</span>
     `;
     elements.news.append(item);
