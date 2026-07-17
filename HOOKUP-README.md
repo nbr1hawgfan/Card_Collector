@@ -1,198 +1,147 @@
-# Rookie Vault - Small Wins Update (v24)
+# Rookie Vault - Small Wins Update (v25)
 
-Five changes. The Trade tab is replaced by a Vault Ledger inventory view,
-and dark mode is now true black with red accents. No Supabase migration
-needed.
+This round: card hobby news, a no-login music panel, and sports expansion
+(player watchlist + in-app box scores). Plus everything from v24 (Vault
+Ledger, true black + red theme, scrolling ticker, CardSight filters, card
+flip). No Supabase migration needed.
 
 **Everything in this bundle is a ready-to-extract, drop-in replacement.**
-`index.html` already has the ledger view, sports feed panel, and version
-tags wired in — you don't need to hand-edit anything. Just replace your
-existing files with these.
+`index.html` already has every panel, stylesheet, and script tag wired in —
+you don't need to hand-edit anything. Just replace your existing files.
 
 ## Files in this bundle (replace all of these)
 
-- `index.html` (Trade tab replaced with Vault Ledger, sports feed panel added, version tags bumped to v24)
-- `js/app.js` (Vault Ledger, CardSight caching + real year/brand filters, card-flip animation, photo shimmer hook)
-- `js/cardsight-diagnostics.js` (unchanged, included for completeness)
-- `js/sports-feed.js` (new)
-- `css/app.css` (unchanged, included for completeness)
-- `css/cardsight-diagnostics.css` (unchanged, included for completeness)
-- `css/sports-feed.css` (new — also holds the Vault Ledger and flip/shimmer styles)
-- `sw.js` (bumped to v24, adds the two new files to the app shell)
+- `index.html` — music panel, hobby news panel, player watchlist, box score
+  dialog all added; version tags bumped to v25
+- `js/app.js` — Vault Ledger, CardSight caching + year/brand filters, card
+  flip, photo shimmer (all from v24, unchanged this round)
+- `js/sports-feed.js` — ticker + news, now with player watchlist and
+  in-app box scores
+- `js/music-feed.js` — **new** — Spotify playlist embeds
+- `js/hobby-news.js` — **new** — card hobby news via RSS
+- `js/cardsight-diagnostics.js` — unchanged, included for completeness
+- `css/app.css` — true black + red dark theme (from v24, unchanged)
+- `css/sports-feed.css` — ticker, Vault Ledger, flip/shimmer styles (v24,
+  unchanged)
+- `css/worlds.css` — **new** — music panel, hobby news, box score dialog
+- `css/cardsight-diagnostics.css` — unchanged, included for completeness
+- `sw.js` — bumped to v25, adds the new files to the app shell
 
 Keep as-is (not in this bundle): `js/config.js`
 
-## 1. Dark mode: true black + red
+## 1. Music panel — no login, no API key needed
 
-This completely replaces the old maroon dark theme — you asked to replace
-it outright, not add a second option. Light mode (your maroon branding) is
-untouched.
+This uses Spotify's public embed player, not the full API. That means:
 
-- Background is genuine black (`#000000`), not dark gray.
-- Accent color is a vivid red (`#ff2b4d`) instead of the muted maroon.
-- Cards, panels, and KPI tiles now use a shadow that includes a soft red
-  glow, which is what gives them the "floating" look — this was a
-  one-line change to the shared `--shadow` variable, so it applies
-  automatically to every card that already used it (stats, panels,
-  ledger rows, show-mode KPIs, collection cards).
-- "Needs price check" (danger color) is now orange instead of red, so it
-  reads as a distinct alert against the red brand accent instead of
-  blending in.
+- **What it does:** shows a real, native Spotify player for a playlist —
+  play, pause, skip all work, right in the app.
+- **What it doesn't do:** it is not "what Brenton is currently playing."
+  That would need the full OAuth login flow we tabled earlier. This is a
+  chosen playlist, not a live feed of his activity.
+- Ships with two defaults I verified are real, current, non-country
+  playlists: **Today's Top Hits** and **RapCaviar**. Both playlist IDs were
+  confirmed live before I put them in the code.
+- Brenton (or you) can add his own via the "Edit playlists" drawer — just
+  paste any Spotify playlist link. No developer account, no API key.
+- Tabs across the top switch between saved playlists; "Remove current"
+  drops whichever one is showing (keeps at least one).
 
-Because the whole app already used CSS custom properties consistently,
-this was genuinely a small, contained change — one variable block in
-`css/app.css`, plus giving `.show-kpi` and the ledger rows a matching
-border/shadow so they float too. Nothing else needed touching.
+If you two want the full "what's actually playing right now" version
+later, that's still the OAuth conversation from before — this doesn't
+replace that, it's the lighter option that was on the table alongside it.
 
-## 2. Sports ticker: now an actual scrolling ticker
+## 2. Card hobby news — real feeds, one honest caveat
 
-The old score panel was a static stacked list. It's now a real, continuously
-scrolling marquee (hover or focus on it to pause and read), and it merges
-three things — all real, computed data, nothing simulated:
+Pulls real headlines from Cardboard Connection and Beckett's news feeds —
+I checked both are live, current RSS feeds before wiring them in.
 
-- **Live/recent scores**, same as before.
-- **Card value moves** — pulled straight from the Vault Ledger's own
-  price-check history (the same real data described below), so a card
-  showing "▲ 9%" in the ledger will also show up in the ticker. Tapping
-  one opens that card's detail dialog.
-- **"In your vault" trending news** — headlines from ESPN that happen to
-  mention a player already in the collection. This is a straightforward
-  text match against player names already in the database, not a
-  trending/buzz score from anywhere.
+**The catch:** browsers block a static site from fetching another site's
+raw RSS feed directly (no CORS). So this goes through a free relay service
+(rss2json.com) that converts RSS to browser-friendly JSON. That's a
+third-party dependency I don't control — if it ever goes down or changes
+its terms, this panel breaks until a new relay URL is swapped into the
+`RELAY` constant at the top of `js/hobby-news.js`. Everything else about
+the feature stays the same; it's a one-line fix, not a rebuild.
 
-It also flashes briefly when a live score actually changes since the last
-check (tracked in memory, compared on each refresh) — real change
-detection, not a random animation. Tapping a score opens that league's
-ESPN scoreboard; tapping a card-move item opens the card in the app.
+This is the one piece in this whole update I couldn't fully verify end to
+end from my side (I can't test browser CORS behavior from here) — worth
+being the first thing you check after deploying.
 
-## 3. Vault Ledger replaces Trade
+## 3. Sports: player watchlist + in-app box scores
 
-The old two-sided trade calculator is gone. In its place, on the same nav
-slot: an inventory view built around what you actually said you wanted —
-value, status, and eBay research in one place, with your "loves an
-inventory" instinct pointed at the collection instead of the warehouse.
+- **Player watchlist** — new field in the sports settings drawer, separate
+  from team names. This does *not* filter live scores (a scoreboard only
+  has team data, not rosters) — it's used to flag "trending" items in the
+  news list and ticker, the same mechanism that already flags players in
+  Brenton's collection. Now it also catches players he's watching but
+  doesn't own yet.
+- **In-app box scores** — tapping a score in the ticker used to open ESPN
+  in a new tab. Now it opens a dialog right in the app with the linescore
+  (period-by-period, when ESPN provides it) and top performers per team.
+  ESPN's summary data shape varies by sport, so this is defensive — if a
+  particular game doesn't have full detail, it shows what it has plus a
+  "View full game on ESPN" link rather than erroring.
 
-**What's real vs. what's not**: I did not fabricate any live market-trend
-data — there's no feed telling you "comps are up 9% today" because that
-data doesn't exist anywhere in your stack yet. Everything shown is computed
-from data you already have:
+## 4. Dark mode: true black + red (from v24)
 
-- **Total value** — sum of `estimated_value × quantity` across active cards.
-- **This week** — a genuine week-over-week % change. The app now takes a
-  daily snapshot of the total portfolio value in `localStorage` each time
-  the ledger renders, and compares today's total to the snapshot closest to
-  7 days ago. Shows "New" until there's at least a week of history — it
-  will never show a made-up number.
-- **Sell candidates** — real count of cards marked "For trade" or
-  "Duplicate" (existing status field, just surfaced here).
-- **Needs price check** — real count of cards with no `price_checked_at`,
-  or one older than 30 days.
-- **Per-row up/down %** — this one's opt-in and grows over time: every time
-  you save pricing research on a card (the existing "Save pricing research"
-  button in the card detail dialog), it now also records that value with a
-  timestamp in `localStorage`. Once a card has two or more saved checks, the
-  ledger shows the real % change between the last two. Cards with fewer
-  than two checks show "—" instead of guessing.
-- **Insights strip** — plain-language version of the same counts above
-  (e.g. "3 duplicates ready to list on eBay"), not a separate data source.
+Background is genuine black (`#000000`), accent is vivid red (`#ff2b4d`),
+and every card that already used the shared `--shadow` variable
+automatically got the "floating" glow look — one variable change, applied
+everywhere consistently. Light mode is untouched. "Needs price check" uses
+orange instead of red so it stays visually distinct from the brand accent.
 
-**If you want true market-trend data later** (real eBay sold-price history
-tracked over time, not just what you manually save), that's a bigger,
-legitimate feature — it'd mean a small price-history table in Supabase and
-either a scheduled job or CardSight's pricing endpoint called on a
-schedule. Worth a separate conversation whenever you're ready; didn't want
-to fake it in the meantime.
+## 5. Scrolling ticker (from v24)
 
-Table view and card-grid view are both there (toggle top-right) — table's
-tighter for you on desktop, cards read better on Brenton's phone. Tapping
-any row opens the existing card detail dialog, same as the collection view.
-The $ icon opens an eBay sold-listings search for that exact card (reusing
-your existing search-string builder); the ↗ icon opens the card detail.
+Merges three real streams: live scores (with a flash when a score actually
+changes since the last check), card value moves pulled from the Vault
+Ledger's own price-check history, and news headlines matching a player in
+the collection or watchlist. Hover or focus to pause and read. Tapping a
+score now opens the in-app box score (see above); tapping a card move opens
+that card.
 
-## 4. CardSight: real year/brand filters + fewer wasted calls
+## 6. Vault Ledger replaces Trade (from v24)
 
-Both the lookup form and the scan/catalog quick search now send CardSight's
-actual `year` and `brand` params (per their API docs) instead of only
-cramming them into the free-text `q`. This should return tighter, more
-relevant results and use fewer of your free-tier calls per session.
+Inventory-style view: total value, real week-over-week % (from an on-device
+daily snapshot), sell candidates, and cards needing a price check. Per-card
+up/down % grows from the existing "Save pricing research" button — nothing
+fabricated, no live market feed invented. Table and card-grid views both
+available.
 
-**Built-in safety net:** if a narrowed search (with `year`/`brand` set)
-comes back with zero results, the code automatically retries using the old
-free-text-merged query before giving up. So if CardSight's filter values
-turn out to need a different format than expected (e.g. a specific string
-vs. a number for `year`), search still works exactly like it did before —
-it just won't be as narrowed until that's sorted out. Nothing can break
-silently; worst case it behaves like the previous version.
+## 7. CardSight: real year/brand filters (from v24)
 
-The results message tells you which path was used: results found "(narrowed
-by year/brand)" means the dedicated filters worked.
+Both the lookup form and the scan/catalog search send CardSight's real
+`year` and `brand` params. If a narrowed search returns zero results, it
+automatically retries with the old free-text-merged query first — a param
+mismatch can't make results worse than before, only less narrowed until
+confirmed correct.
 
-On top of that, all `catalog.search` calls (narrowed or fallback) are cached
-in memory for 5 minutes per exact param set, so repeating a search or
-switching back to a previous view doesn't re-bill the API.
+## 8. Card detail flip animation (from v24)
 
-**Worth double-checking:** I used `year` and `brand` as the param names
-based on what you said the docs show. If CardSight's docs use slightly
-different casing or names (e.g. `cardYear`), it's a one-line fix in
-`searchCardSightNarrowed` near the top of `app.js` — the fallback keeps it
-safe in the meantime either way.
-
-## 5. Card detail flip animation
-
-Tapping "Front"/"Back" on a card's detail view now does a quick rotateY
-flip (edge-on, swap the photo, rotate back) instead of an instant image
-swap. It's CSS + a small JS timing change only — same buttons, same photo
-element, no new markup needed. First time a card's dialog opens there's no
-animation (avoids a flash before any photo has loaded).
-
-## 6. Live scores + news feed (base panel)
-
-Already wired into `index.html` in this bundle: the panel sits on the Home
-view between the welcome card and your stats grid, the stylesheet and
-script tags are added, and `app.js` already imports and calls
-`initSportsFeed()` on startup. Nothing to add by hand.
-
-## Where the data comes from
-
-ESPN's public site API (`site.api.espn.com`) — no key, no signup, no cost,
-and it's CORS-friendly for browser calls, which is why the existing service
-worker doesn't need changes to let it through (it already skips every
-cross-origin request). Results are cached in memory for 10 minutes per
-session so switching views doesn't refetch constantly.
-
-If Brenton hasn't set favorite teams yet, the panel shows recent
-league-wide games and top headlines across all four sports, so it's never
-empty.
-
-**Note:** this is ESPN's unofficial public API — reliable in practice but
-undocumented, so they could change the response shape without notice. Fine
-for a hobby app; just know it's not a formal, versioned API like CardSight.
-
-## Device cleanup after deploying
-
-Same as the v23 note: refresh once, close all tabs, reopen. Installed
-home-screen icons should be removed and reinstalled once so the new service
-worker takes over cleanly.
+Front/Back toggle does a quick rotateY flip instead of an instant swap.
 
 ## Before you commit
 
-Test in this order so a problem is easy to isolate:
-1. Load the app normally, confirm existing collection/photos still render.
-2. Switch to dark mode — confirm it's true black with red accents, and that
-   text is still readable everywhere (KPI cards, ledger, forms).
-3. Open the Ledger tab (bottom nav, replaces where Trade was). Confirm the
-   metric strip shows real numbers and doesn't error in the console.
-4. Check the ticker on Home — it should be scrolling continuously, and
-   pause when you hover/focus it.
-5. Save pricing research on a card twice (a few minutes apart is fine) and
-   confirm the ledger row shows a real up/down % on the second save, and
-   that it also appears in the ticker.
-6. Run a CardSight lookup search with a year and brand filled in — check the
-   result message for "(narrowed by year/brand)" to confirm the real params
-   worked.
-7. Open a card's detail view and tap Front/Back to see the flip.
+Test in roughly this order:
+
+1. Load the app normally — confirm existing collection/photos still render.
+2. Dark mode — true black, red accents, text still readable everywhere.
+3. Home screen — confirm the ticker scrolls, and the new Music and Card
+   Hobby News panels both load. **This is the one to check first if
+   anything looks broken** — the hobby news relay is the single external
+   dependency I couldn't test end-to-end myself.
+4. Tap a score in the ticker — confirm the box score dialog opens with
+   real data (or the graceful fallback message) instead of leaving the app.
+5. Add a player to the watchlist in sports settings, save, and confirm it
+   doesn't affect which scores show (only news/ticker highlighting).
+6. Add a Spotify playlist link in the Music panel settings and confirm the
+   new tab plays.
+7. Open the Ledger tab — confirm the metric strip shows real numbers.
+8. Save pricing research on a card twice and confirm a real % shows in the
+   ledger row and ticker on the second save.
+9. Run a CardSight lookup search with year + brand filled in — check for
+   "(narrowed by year/brand)" in the result message.
+10. Tap Front/Back on a card detail to see the flip.
 
 ## Suggested commit
 
-`True black + red dark theme, scrolling ticker with real card moves, Vault Ledger replaces Trade, CardSight year/brand filters, card flip animation`
-
+`Add music panel and card hobby news, player watchlist + in-app box scores, true black/red theme, scrolling ticker, Vault Ledger, CardSight filters`

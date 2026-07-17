@@ -7,9 +7,10 @@
   <meta name="description" content="A private family sports card collection app.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/app.css?v=24">
-  <link rel="stylesheet" href="./css/cardsight-diagnostics.css?v=24">
-  <link rel="stylesheet" href="./css/sports-feed.css?v=24">
+  <link rel="stylesheet" href="./css/app.css?v=25">
+  <link rel="stylesheet" href="./css/cardsight-diagnostics.css?v=25">
+  <link rel="stylesheet" href="./css/sports-feed.css?v=25">
+  <link rel="stylesheet" href="./css/worlds.css?v=25">
   <title>Rookie Vault</title>
 </head>
 <body>
@@ -74,27 +75,80 @@
           <div class="diagnostic-heading">
             <div>
               <h4>Live scores &amp; news</h4>
-              <p class="muted">MLB, NFL, NBA, and NHL — filtered to your favorite teams.</p>
+              <p class="muted">MLB, NFL, NBA, and NHL — filtered to your favorite teams and players.</p>
             </div>
             <div class="diagnostic-actions" style="margin-top:0">
-              <button id="sportsFeedSettingsButton" class="button button-secondary" type="button">Teams</button>
+              <button id="sportsFeedSettingsButton" class="button button-secondary" type="button">Teams &amp; players</button>
               <button id="refreshSportsFeedButton" class="button button-secondary" type="button">Refresh</button>
             </div>
           </div>
 
           <details id="sportsFeedSettings" class="cardsight-settings hidden">
-            <summary>Favorite teams</summary>
+            <summary>Favorite teams &amp; players</summary>
             <label>Comma-separated team names (e.g. Yankees, Chiefs, Lakers)
               <input id="sportsFeedTeamsInput" type="text" placeholder="Yankees, Chiefs">
             </label>
+            <label>Comma-separated players to watch (used for news/ticker highlights, not scores)
+              <input id="sportsFeedPlayersInput" type="text" placeholder="Victor Wembanyama, CJ Stroud">
+            </label>
             <div class="diagnostic-actions">
-              <button id="saveSportsFeedTeamsButton" class="button" type="button">Save teams</button>
+              <button id="saveSportsFeedTeamsButton" class="button" type="button">Save</button>
             </div>
           </details>
 
           <div id="sportsFeedScores" class="sports-feed-scores"></div>
           <div id="sportsFeedNews" class="sports-feed-news"></div>
           <p id="sportsFeedMessage" class="muted small"></p>
+        </section>
+
+        <section class="panel music-feed-panel" id="musicFeedPanel">
+          <div class="diagnostic-heading">
+            <div>
+              <h4>Soundtrack</h4>
+              <p class="muted">Brenton's playlists, right here — no login needed.</p>
+            </div>
+            <button id="musicFeedSettingsButton" class="button button-secondary" type="button">Edit playlists</button>
+          </div>
+
+          <details id="musicFeedSettings" class="cardsight-settings hidden">
+            <summary>Add a playlist</summary>
+            <label>Spotify playlist link
+              <input id="musicFeedUrlInput" type="text" placeholder="https://open.spotify.com/playlist/...">
+            </label>
+            <label>Label
+              <input id="musicFeedLabelInput" type="text" placeholder="Brenton's picks">
+            </label>
+            <div class="diagnostic-actions">
+              <button id="addMusicPlaylistButton" class="button" type="button">Add</button>
+              <button id="removeMusicPlaylistButton" class="button button-secondary" type="button">Remove current</button>
+            </div>
+          </details>
+
+          <div id="musicFeedTabs" class="filter-row"></div>
+          <iframe
+            id="musicFeedFrame"
+            class="music-feed-frame"
+            title="Spotify playlist"
+            style="border-radius:12px"
+            width="100%"
+            height="152"
+            frameborder="0"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+          ></iframe>
+          <p id="musicFeedMessage" class="muted small"></p>
+        </section>
+
+        <section class="panel hobby-news-panel" id="hobbyNewsPanel">
+          <div class="diagnostic-heading">
+            <div>
+              <h4>Card hobby news</h4>
+              <p class="muted">Latest from the sports card press.</p>
+            </div>
+            <button id="refreshHobbyNewsButton" class="button button-secondary" type="button">Refresh</button>
+          </div>
+          <div id="hobbyNewsList" class="sports-feed-news"></div>
+          <p id="hobbyNewsMessage" class="muted small"></p>
         </section>
 
         <section class="stats-grid">
@@ -866,6 +920,13 @@
     </div>
   </dialog>
 
+  <dialog id="boxScoreDialog" class="card-dialog box-score-dialog">
+    <button id="boxScoreClose" class="dialog-close" type="button" aria-label="Close box score">×</button>
+    <h3 id="boxScoreTitle">Box score</h3>
+    <div id="boxScoreBody" class="box-score-body"></div>
+    <a id="boxScoreEspnLink" class="button button-secondary" href="#" target="_blank" rel="noopener noreferrer">View full game on ESPN</a>
+  </dialog>
+
   <dialog id="cardDialog" class="card-dialog">
     <button id="closeDialogButton" class="dialog-close" type="button" aria-label="Close card details">×</button>
 
@@ -1002,8 +1063,10 @@
     </article>
   </template>
 
-  <script type="module" src="./js/app.js?v=24"></script>
-  <script type="module" src="./js/cardsight-diagnostics.js?v=24"></script>
-  <script type="module" src="./js/sports-feed.js?v=24"></script>
+  <script type="module" src="./js/app.js?v=25"></script>
+  <script type="module" src="./js/cardsight-diagnostics.js?v=25"></script>
+  <script type="module" src="./js/sports-feed.js?v=25"></script>
+  <script type="module" src="./js/music-feed.js?v=25"></script>
+  <script type="module" src="./js/hobby-news.js?v=25"></script>
 </body>
 </html>

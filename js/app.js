@@ -2,6 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createWorker } from "https://esm.sh/tesseract.js@7.0.0";
 import * as CardSightSdk from "https://esm.sh/cardsightai@3.6.0";
 import { initSportsFeed } from "./sports-feed.js";
+import { initMusicFeed } from "./music-feed.js";
+import { initHobbyNews } from "./hobby-news.js";
 
 const PHOTO_BUCKET = "card-photos";
 const MAX_IMAGE_EDGE = 1800;
@@ -360,6 +362,8 @@ function bindEvents() {
   updateWishlistFields();
   updateCardSightStatus();
   initSportsFeed();
+  initMusicFeed();
+  initHobbyNews();
   elements.signupButton.addEventListener("click", signUp);
   elements.logoutButton.addEventListener("click", signOut);
   elements.themeToggle.addEventListener("click", toggleTheme);

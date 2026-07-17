@@ -12,6 +12,7 @@
 //      collection ("trending in your collection").
 
 const TEAMS_KEY = "rookie-vault-favorite-teams";
+const PLAYERS_KEY = "rookie-vault-favorite-players";
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes - keep requests light
 
 const LEAGUES = {
@@ -33,17 +34,24 @@ const elements = {
   settings: document.querySelector("#sportsFeedSettings"),
   settingsButton: document.querySelector("#sportsFeedSettingsButton"),
   teamsInput: document.querySelector("#sportsFeedTeamsInput"),
+  playersInput: document.querySelector("#sportsFeedPlayersInput"),
   saveTeamsButton: document.querySelector("#saveSportsFeedTeamsButton"),
   refreshButton: document.querySelector("#refreshSportsFeedButton"),
   ticker: document.querySelector("#sportsFeedScores"),
   news: document.querySelector("#sportsFeedNews"),
-  message: document.querySelector("#sportsFeedMessage")
+  message: document.querySelector("#sportsFeedMessage"),
+  boxScoreDialog: document.querySelector("#boxScoreDialog"),
+  boxScoreTitle: document.querySelector("#boxScoreTitle"),
+  boxScoreBody: document.querySelector("#boxScoreBody"),
+  boxScoreClose: document.querySelector("#boxScoreClose"),
+  boxScoreEspnLink: document.querySelector("#boxScoreEspnLink")
 };
 
 export function initSportsFeed() {
   if (!elements.panel) return;
 
   elements.teamsInput.value = getFavoriteTeams().join(", ");
+  if (elements.playersInput) elements.playersInput.value = getFavoritePlayers().join(", ");
 
   elements.settingsButton?.addEventListener("click", () => {
     elements.settings.classList.toggle("hidden");
@@ -55,11 +63,25 @@ export function initSportsFeed() {
       .map(team => team.trim())
       .filter(Boolean);
     saveFavoriteTeams(teams);
+
+    if (elements.playersInput) {
+      const players = elements.playersInput.value
+        .split(",")
+        .map(player => player.trim())
+        .filter(Boolean);
+      saveFavoritePlayers(players);
+    }
+
     elements.settings.classList.add("hidden");
     loadFeed();
   });
 
   elements.refreshButton?.addEventListener("click", () => loadFeed(true));
+
+  elements.boxScoreClose?.addEventListener("click", () => elements.boxScoreDialog.close());
+  elements.boxScoreDialog?.addEventListener("click", event => {
+    if (event.target === elements.boxScoreDialog) elements.boxScoreDialog.close();
+  });
 
   // Re-render the ticker (no re-fetch) whenever the Vault Ledger has fresh
   // card-value data, e.g. after saving pricing research on a card.
@@ -68,6 +90,28 @@ export function initSportsFeed() {
   });
 
   loadFeed();
+}
+
+function getFavoritePlayers() {
+  return (localStorage.getItem(PLAYERS_KEY) || "")
+    .split(",")
+    .map(player => player.trim())
+    .filter(Boolean);
+}
+
+function saveFavoritePlayers(players) {
+  localStorage.setItem(PLAYERS_KEY, players.join(", "));
+}
+
+// Players you're watching, plus everyone already in the collection - the
+// combined pool used to flag "trending" news/ticker items. This does not
+// filter live scores, since a scoreboard only has team-level data, not
+// rosters.
+function getWatchedPlayers() {
+  const collectionPlayers = Array.isArray(window.rookieVaultCollectionPlayers)
+    ? window.rookieVaultCollectionPlayers
+    : [];
+  return [...new Set([...collectionPlayers, ...getFavoritePlayers()])];
 }
 
 function getFavoriteTeams() {
@@ -220,6 +264,109 @@ function matchesFavorites(event, favorites) {
   return favorites.some(team => text.includes(team.toLowerCase()));
 }
 
+// ---- In-app box score (keeps him from ever leaving the app) ----
+
+async function openBoxScore(event) {
+  if (!elements.boxScoreDialog) return;
+
+  elements.boxScoreTitle.textContent = `${event.away.name} @ ${event.home.name}`;
+  elements.boxScoreBody.replaceChildren();
+  const loading = document.createElement("p");
+  loading.className = "muted small";
+  loading.textContent = "Loading box score...";
+  elements.boxScoreBody.append(loading);
+
+  const espnPath = LEAGUES[event.leagueKey]?.path;
+  elements.boxScoreEspnLink.href = espnPath
+    ? `https://www.espn.com/${espnPath.split("/")[1]}/game/_/gameId/${event.id}`
+    : "#";
+
+  elements.boxScoreDialog.showModal();
+
+  if (!espnPath) return;
+
+  try {
+    const data = await cachedFetch(
+      `https://site.api.espn.com/apis/site/v2/sports/${espnPath}/summary?event=${event.id}`,
+      false
+    );
+    renderBoxScore(data, event);
+  } catch (error) {
+    console.warn("Box score failed:", error);
+    elements.boxScoreBody.replaceChildren();
+    const failed = document.createElement("p");
+    failed.className = "muted small";
+    failed.textContent = "Couldn't load the box score. Try the ESPN link below.";
+    elements.boxScoreBody.append(failed);
+  }
+}
+
+function renderBoxScore(data, event) {
+  elements.boxScoreBody.replaceChildren();
+
+  const summary = document.createElement("p");
+  summary.className = "box-score-line";
+  summary.textContent =
+    `${event.away.name} ${event.away.score} – ${event.home.name} ${event.home.score} · ${event.status}`;
+  elements.boxScoreBody.append(summary);
+
+  // Linescore by period, when ESPN provides it. Shape varies by sport, so
+  // this is defensive and simply skips anything it doesn't recognize.
+  const competitors = data?.header?.competitions?.[0]?.competitors || [];
+  if (competitors.length && competitors.every(c => Array.isArray(c.linescores))) {
+    const table = document.createElement("table");
+    table.className = "box-score-table";
+
+    const periods = competitors[0].linescores.length;
+    const head = document.createElement("tr");
+    head.innerHTML =
+      "<th></th>" +
+      Array.from({ length: periods }, (_, i) => `<th>${i + 1}</th>`).join("") +
+      "<th>T</th>";
+    table.append(head);
+
+    for (const competitor of competitors) {
+      const row = document.createElement("tr");
+      const name = competitor.team?.shortDisplayName || competitor.team?.abbreviation || "";
+      const cells = competitor.linescores.map(period => `<td>${period.displayValue ?? "-"}</td>`).join("");
+      row.innerHTML = `<td class="box-score-team">${escapeHtml(name)}</td>${cells}<td><strong>${escapeHtml(String(competitor.score ?? ""))}</strong></td>`;
+      table.append(row);
+    }
+
+    elements.boxScoreBody.append(table);
+  }
+
+  // Top performer per team, when ESPN provides leaders.
+  const leaders = data?.leaders || [];
+  if (leaders.length) {
+    const leaderWrap = document.createElement("div");
+    leaderWrap.className = "box-score-leaders";
+
+    for (const teamLeaders of leaders) {
+      const topCategory = teamLeaders.leaders?.[0];
+      const topAthlete = topCategory?.leaders?.[0];
+      if (!topAthlete) continue;
+
+      const line = document.createElement("p");
+      line.className = "box-score-leader-line";
+      line.textContent =
+        `${teamLeaders.team?.shortDisplayName || ""}: ${topAthlete.athlete?.displayName || "—"} — ${topCategory.displayName || ""} ${topAthlete.displayValue || ""}`;
+      leaderWrap.append(line);
+    }
+
+    if (leaderWrap.childElementCount) {
+      elements.boxScoreBody.append(leaderWrap);
+    }
+  }
+
+  if (elements.boxScoreBody.childElementCount <= 1) {
+    const note = document.createElement("p");
+    note.className = "muted small";
+    note.textContent = "Full box score details aren't available for this game yet.";
+    elements.boxScoreBody.append(note);
+  }
+}
+
 // ---- Ticker: scores + real card value moves + trending news, merged ----
 
 function renderTicker(events, articles, favorites) {
@@ -258,16 +405,7 @@ function buildTickerItems(events, articles) {
     items.push({
       type: "score",
       justUpdated: event.justUpdated,
-      onClick: () => {
-        const espnLeague = LEAGUES[event.leagueKey]?.path;
-        if (espnLeague) {
-          window.open(
-            `https://www.espn.com/${espnLeague.split("/")[1]}/scoreboard`,
-            "_blank",
-            "noopener,noreferrer"
-          );
-        }
-      },
+      onClick: () => openBoxScore(event),
       render: () => {
         const wrap = document.createElement("span");
         wrap.className = "rv-ticker-item";
@@ -306,9 +444,7 @@ function buildTickerItems(events, articles) {
     });
   }
 
-  const collectionPlayers = Array.isArray(window.rookieVaultCollectionPlayers)
-    ? window.rookieVaultCollectionPlayers
-    : [];
+  const collectionPlayers = getWatchedPlayers();
 
   if (collectionPlayers.length) {
     const trending = articles
@@ -368,9 +504,7 @@ function renderNews(articles) {
     return;
   }
 
-  const collectionPlayers = Array.isArray(window.rookieVaultCollectionPlayers)
-    ? window.rookieVaultCollectionPlayers
-    : [];
+  const collectionPlayers = getWatchedPlayers();
 
   for (const article of articles) {
     const isTrending = collectionPlayers.some(player =>
