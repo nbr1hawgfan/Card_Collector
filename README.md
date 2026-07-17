@@ -1,4 +1,4 @@
-# Rookie Vault CardSight Mapping Fix
+# Rookie Vault Save Visibility Fix
 
 No Supabase migration is required.
 
@@ -15,19 +15,16 @@ Keep:
 
 ## Fixes
 
-- Preserves the original search-result data when full CardSight details are loaded
-- Merges search results and full card records instead of replacing one with the other
-- Reads alternate CardSight field names and nested objects
-- Correctly maps year from year, cardYear, releaseYear, or release.year
-- Correctly maps brand from manufacturer, brand, manufacturerName, or release data
-- Correctly maps set/release names
-- Correctly maps card number aliases
-- Correctly maps parallel/variant/variation fields
-- Correctly maps numbered-to / print-run fields
-- Falls back to structured `fields` metadata when direct properties are absent
-- Uses the same mapping logic for result display and Add Card population
-- PWA cache version v20
+- Insert/update now uses `.select("*").single()` so Supabase must return the saved row
+- Save is treated as successful only when a card ID is returned
+- Collection reload verifies the exact saved card is present
+- Old search, sport, status, and Trash filters are cleared after saving
+- Rookie Vault navigates directly to Collection
+- The newly saved card opens automatically
+- Success messages are no longer erased by `loadCards()`
+- Clear error shown when a database save or reload cannot be verified
+- PWA cache version v21
 
 Suggested commit:
 
-`Fix CardSight year brand and parallel mapping`
+`Verify saved cards and reveal them in collection`

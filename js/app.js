@@ -537,7 +537,6 @@ async function loadCards() {
 
   cards = data ?? [];
   await attachSignedPhotoUrls(cards);
-  setCardMessage("");
   renderCards();
   if (activeAppView === "trade") renderTradeBuilder();
 }
@@ -653,20 +652,47 @@ async function saveCard(event) {
     };
 
     let error;
+    let savedCard = null;
 
     if (editingCard) {
       setCardMessage("Updating card...");
-      ({ error } = await supabase
+      const result = await supabase
         .from("cards")
         .update(payload)
         .eq("id", editingCard.id)
-        .eq("collection_id", currentCollectionId));
+        .eq("collection_id", currentCollectionId)
+        .select("*")
+        .single();
+
+      error = result.error;
+      savedCard = result.data;
     } else {
       setCardMessage("Saving card...");
-      ({ error } = await supabase.from("cards").insert(payload));
+      const result = await supabase
+        .from("cards")
+        .insert(payload)
+        .select("*")
+        .single();
+
+      error = result.error;
+      savedCard = result.data;
     }
 
     if (error) throw error;
+
+    if (!savedCard?.id) {
+      throw new Error(
+        "The database did not return the saved card. The save could not be verified."
+      );
+    }
+
+    console.info("Rookie Vault verified database save:", {
+      id: savedCard.id,
+      player_name: savedCard.player_name,
+      collection_id: savedCard.collection_id,
+      status: savedCard.status,
+      created_at: savedCard.created_at
+    });
 
     if (oldPathsToDelete.length) {
       const { error: cleanupError } = await supabase.storage
@@ -678,14 +704,32 @@ async function saveCard(event) {
       }
     }
 
-    const successMessage = editingCard
-      ? "Card updated successfully."
-      : "Card and photos saved.";
+    const wasEditing = Boolean(editingCard);
+    const savedCardId = savedCard.id;
 
     resetCardForm();
-    setCardMessage(successMessage);
     await loadCards();
-    navigateTo("home");
+
+    const verifiedCard = cards.find(card => card.id === savedCardId);
+
+    if (!verifiedCard) {
+      throw new Error(
+        "The card was saved, but it did not appear when the collection reloaded. Please refresh once and check again."
+      );
+    }
+
+    clearCollectionFilters();
+    navigateTo("collection");
+
+    setCardMessage(
+      wasEditing
+        ? `${verifiedCard.player_name} was updated and verified in the collection.`
+        : `${verifiedCard.player_name} was saved and verified in the collection.`
+    );
+
+    window.setTimeout(() => {
+      openCardDialog(verifiedCard);
+    }, 250);
   } catch (error) {
     console.error("Card save failed:", error);
     setCardMessage(error?.message || "Could not save the card.");
@@ -2764,6 +2808,32 @@ function renderRecentCards(activeCards) {
   }
 
   elements.recentEmptyState.classList.toggle("hidden", recent.length > 0);
+}
+
+
+function clearCollectionFilters() {
+  collectionView = "active";
+  activeSport = "all";
+  activeStatus = "all";
+
+  elements.searchInput.value = "";
+
+  const allSportButton =
+    elements.sportFilters.querySelector('[data-sport="all"]');
+  const allStatusButton =
+    elements.statusFilters.querySelector('[data-status="all"]');
+
+  if (allSportButton) {
+    setActiveChip(elements.sportFilters, allSportButton);
+  }
+
+  if (allStatusButton) {
+    setActiveChip(elements.statusFilters, allStatusButton);
+  }
+
+  elements.activeViewButton.classList.add("active");
+  elements.trashViewButton.classList.remove("active");
+  elements.collectionTitle.textContent = "Your cards";
 }
 
 function switchCollectionView(view) {
